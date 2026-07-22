@@ -1,0 +1,112 @@
+name: Deprecate a specific version
+
+# Manual, one version range at a time. Unlike a whole-package deprecation, this
+# targets a RANGE — used when particular releases were mistakes but the package
+# itself is healthy and current.
+#
+# What deprecation does and does NOT do:
+#   - DOES: print a warning on install and show a banner on npmjs.com.
+#   - Does NOT remove anything. Those versions stay installable forever, and
+#     existing lockfiles keep resolving exactly as before.
+#
+# Reversible (`npm deprecate <pkg>@<range> ""` clears it), but outward-facing,
+# so this defaults to a dry run and requires typing the range to confirm.
+
+on:
+  workflow_dispatch:
+    inputs:
+      package:
+        description: "Package"
+        required: true
+        type: choice
+        options:
+          - "@ouronet/ouronet-core"
+          - "@ouronet/ouronet-codex"
+      range:
+        description: 'Version range, e.g. "4.3.6" or ">=4.3.6 <4.4.0"'
+        required: true
+        type: string
+      message:
+        description: "Deprecation message shown on install"
+        required: true
+        type: string
+      confirm:
+        description: "Retype the range exactly to run for real. Blank = dry run."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  deprecate:
+    name: Deprecate ${{ inputs.package }}@${{ inputs.range }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Decide dry run vs real
+        id: gate
+        run: |
+          if [ "${{ inputs.confirm }}" = "${{ inputs.range }}" ]; then
+            echo "real=true" >> "$GITHUB_OUTPUT"
+            echo "Confirmation matched — this run WILL deprecate on npm."
+          else
+            echo "real=false" >> "$GITHUB_OUTPUT"
+            echo "DRY RUN — nothing will be sent to npm."
+          fi
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Write .npmrc with auth token
+        run: |
+          cat > .npmrc <<EOF
+          //registry.npmjs.org/:_authToken=${{ secrets.NPM_PUBLISHER }}
+          @ouronet:registry=https://registry.npmjs.org
+          EOF
+          echo "--- .npmrc structure (token redacted) ---"
+          sed 's|=.*|=***|' .npmrc
+
+      # Guard: never deprecate the version consumers are meant to land on.
+      # A range that swallows `latest` would warn every correct install.
+      - name: Verify the range does not cover the current latest
+        run: |
+          LATEST=$(npm view ${{ inputs.package }} dist-tags.latest)
+          echo "latest is ${LATEST}; requested range is '${{ inputs.range }}'"
+          COVERED=$(npx --yes semver -r "${{ inputs.range }}" "${LATEST}" || true)
+          if [ -n "$COVERED" ]; then
+            echo "::error::Range '${{ inputs.range }}' includes the current latest (${LATEST}). That would warn on every correct install."
+            exit 1
+          fi
+          echo "✓ latest (${LATEST}) is outside the range"
+
+      - name: Show what is in range
+        run: |
+          echo "versions currently published:"
+          npm view ${{ inputs.package }} versions --json
+
+      - name: Deprecate
+        if: steps.gate.outputs.real == 'true'
+        run: |
+          npm deprecate "${{ inputs.package }}@${{ inputs.range }}" "${{ inputs.message }}"
+          echo "Deprecated ${{ inputs.package }}@${{ inputs.range }}"
+
+      - name: Confirm
+        if: steps.gate.outputs.real == 'true'
+        run: |
+          sleep 15
+          echo "deprecated versions now:"
+          npm view ${{ inputs.package }} --json 2>/dev/null | node -e "
+            let d='';process.stdin.on('data',c=>d+=c).on('end',()=>{
+              try { const j=JSON.parse(d); console.log(j.deprecated ?? '(check individual versions on npmjs.com)'); }
+              catch { console.log('(registry may need a minute)'); }
+            })"
+
+      - name: Dry-run summary
+        if: steps.gate.outputs.real != 'true'
+        run: |
+          echo "DRY RUN — nothing sent to npm."
+          echo "To run for real, dispatch again with confirm = ${{ inputs.range }}"
