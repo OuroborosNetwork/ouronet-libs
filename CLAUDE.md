@@ -18,6 +18,16 @@ Treat this as a library repo, not an app: no UI shell, no server, no runtime ent
 
 The dependency direction is one-way: **ouronet-libs → stoa-js**, never the reverse. If something here needs a change in a `@stoachain/*` package, that change ships from `stoa-js` first and lands here as a version bump.
 
+### The chain peers are EXACT — releases are lockstep
+
+`ouronet-core` pins `@stoachain/stoa-core` and `@stoachain/kadena-stoic-legacy` to exact versions, not ranges. This is a deliberate choice (maximum determinism: a consumer tree can only ever resolve one chain version), and it carries an obligation:
+
+> **Every `stoa-js` release requires a matching `ouronet-core` release.**
+
+Because the two repos release independently, a chain-level bump instantly makes the currently-published `ouronet-core` unsatisfiable for anyone resolving the new chain version — a consumer on `^4.3.0` picks up the new stoa-core and then cannot satisfy `ouronet-core`'s exact peer. This is not hypothetical: stoa-js 4.3.7 stranded `ouronet-core@4.3.6` exactly this way, and 4.3.7 here is the repair.
+
+So when stoa-js ships X.Y.Z, ship `ouronet-core` with its peers moved to X.Y.Z in the same sitting. The root `devDependencies` must match the peer pins too — `tests/v4-1-1-cross-package-version-pin.test.ts` enforces that, so a half-done bump fails the suite rather than reaching npm.
+
 ## Renamed from `@stoachain/*`
 
 | Was | Now |

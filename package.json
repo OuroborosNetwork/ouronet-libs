@@ -18,8 +18,8 @@
     "clean": "npm run clean --workspaces"
   },
   "devDependencies": {
-    "@stoachain/kadena-stoic-legacy": "4.3.6",
-    "@stoachain/stoa-core": "4.3.6",
+    "@stoachain/kadena-stoic-legacy": "4.3.7",
+    "@stoachain/stoa-core": "4.3.7",
     "@types/node": "^22.10.0",
     "js-yaml": "^4.1.0",
     "rimraf": "^6.0.1",

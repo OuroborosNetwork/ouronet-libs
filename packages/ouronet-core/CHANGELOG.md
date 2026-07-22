@@ -4,6 +4,18 @@ All notable changes to `@ouronet/ouronet-core`.
 
 This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3.3.8. v4.0.0 split it into a two-package npm workspace under `StoaChain/stoa-js` — chain-generic infrastructure moved out into [`@stoachain/stoa-core`](https://www.npmjs.com/package/@stoachain/stoa-core), this package retained the Ouronet-specific business logic. The `4.0.0` heading below is the first release after the split.
 
+## 4.3.7 — 2026-07-22
+
+**PATCH — chain-peer realignment, no code change.**
+
+Re-pins the exact peer dependencies onto the chain layer: `@stoachain/stoa-core` and `@stoachain/kadena-stoic-legacy` move `4.3.6` → `4.3.7`. No source in this package changed.
+
+Why it is needed: this package pins its chain peers EXACTLY. That was free when all three shipped atomically from one repo, but since the Phase-4 split the chain packages release independently from `StoaChain/stoa-js`. stoa-js 4.3.7 (which repointed DALOS onto `@ouronet/dalos-crypto`) therefore left `@ouronet/ouronet-core@4.3.6` demanding a chain version consumers no longer resolve — any tree pulling `^4.3.0` got an unsatisfiable peer.
+
+**Consequence to keep in mind:** the exact pin is deliberate, so this coupling is permanent. Every `stoa-js` release now requires a matching `ouronet-core` release, or consumers who upgrade the chain layer break. Ship them together.
+
+**785 specs pass.**
+
 ## 4.3.6 — 2026-06-11
 
 Atomic-triplet lockstep bump — `4.3.5 → 4.3.6` alongside `@stoachain/stoa-core` (which carries an auto-gas-limit floor fix in `calculateAutoGasLimit` — a dirty-read under-reports a signed tx's real cost, so tiny estimates were starving txs) and `@stoachain/kadena-stoic-legacy`, per the cross-package version-pin invariant. This package is functionally identical to its 4.3.5 release.

@@ -16,14 +16,14 @@ describe("REQ-05: ouronet-core peer-dep coverage", () => {
   const pkg = JSON.parse(readFileSync(resolve(here, "..", "package.json"), "utf8"));
   const peers = pkg.peerDependencies ?? {};
 
-  it("@stoachain/stoa-core peer-dep is exact-pin '4.3.6'", () => {
-    expect(peers["@stoachain/stoa-core"]).toBe("4.3.6");
+  it("@stoachain/stoa-core peer-dep is exact-pin '4.3.7'", () => {
+    expect(peers["@stoachain/stoa-core"]).toBe("4.3.7");
   });
 
   it("@stoachain/kadena-stoic-legacy is OPTIONAL (transitive via stoa-core; declared as peer for monorepo workspace resolution)", () => {
     // Either declared as peer (with version) OR not declared at all are both acceptable
     if (peers["@stoachain/kadena-stoic-legacy"] !== undefined) {
-      expect(peers["@stoachain/kadena-stoic-legacy"]).toBe("4.3.6");
+      expect(peers["@stoachain/kadena-stoic-legacy"]).toBe("4.3.7");
     }
   });
 
