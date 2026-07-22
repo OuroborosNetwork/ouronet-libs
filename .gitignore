@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Test output / caches
+coverage/
+.vitest-cache/
+
+# Local secrets (token store for git push automation)
+.secrets/
+
+# Wasp local workflow state (cross-pollinate config, state, history) — local-only
+.wasp/
+
+# Bee local workflow state (specs, phases, session artifacts) — local-only, not shipped
+.bee/
+
+# Claude Code per-checkout state
+.claude/
+
+# Editor + OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment
+.env
+.env.local
+
+# Re-include Phase 0 baseline-snapshot oracle artifacts under .bee/specs/
+# AND under .bee/archive/ (shipped specs migrate from specs/ to archive/ on
+# /bee:archive-spec; the snapshots remain a permanent historical reference).
+# These JSON snapshots are the byte-identity gold-standard for the
+# kadena-stoic-legacy migration's Phase 7 verification gate (REQ-29) and
+# MUST be tracked in git. Per gitignore(5), a child cannot be re-included if
+# any of its parent directories is excluded, so we re-include each ancestor
+# directory explicitly while immediately re-excluding ALL siblings that
+# AREN'T the baseline-snapshots subtree. This keeps every other .bee/ file
+# (sessions, STATE.md, ARCHITECTURE.md, spec docs, etc.) ignored as before
+# — ONLY the snapshot oracle leaks out of the .bee/ blanket exclusion.
+!.bee/
+.bee/*
+!.bee/specs/
+.bee/specs/*
+!.bee/specs/*/
+.bee/specs/*/*
+!.bee/specs/*/baseline-snapshots/
+!.bee/specs/*/baseline-snapshots/**
+!.bee/specs/*/phase-*-triage-results.md
+!.bee/archive/
+.bee/archive/*
+!.bee/archive/*/
+.bee/archive/*/*
+!.bee/archive/*/baseline-snapshots/
+!.bee/archive/*/baseline-snapshots/**

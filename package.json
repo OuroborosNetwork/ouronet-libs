@@ -1,0 +1,35 @@
+{
+  "name": "ouronet-libs",
+  "version": "0.0.0",
+  "description": "Ouronet TypeScript stack — workspace root for @ouronet/ouronet-core (Ouronet protocol business logic) and @ouronet/ouronet-codex (modular React Codex layer for consumer apps). Split out of StoaChain/stoa-js in the Phase-4 reorg; the chain-level halves (@stoachain/stoa-core, @stoachain/kadena-stoic-legacy) remain in stoa-chain-libs and are consumed from npm.",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspace=@ouronet/ouronet-core && npm run build --workspace=@ouronet/ouronet-codex",
+    "typecheck": "npm run typecheck --workspaces",
+    "test": "npm run test --workspaces",
+    "test:watch": "npm run test:watch --workspaces",
+    "clean": "npm run clean --workspaces"
+  },
+  "devDependencies": {
+    "@stoachain/kadena-stoic-legacy": "4.3.6",
+    "@stoachain/stoa-core": "4.3.6",
+    "@types/node": "^22.10.0",
+    "js-yaml": "^4.1.0",
+    "rimraf": "^6.0.1",
+    "tsx": "4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^4.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OuroborosNetwork/ouronet-libs.git"
+  },
+  "license": "UNLICENSED"
+}

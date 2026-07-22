@@ -1,0 +1,64 @@
+{
+  "name": "@ouronet/ouronet-core",
+  "version": "4.3.6",
+  "description": "Ouronet-specific business logic for the Ouronet protocol on StoaChain — interactions/* read+execute functions for the ouronet-ns Pact modules, the Codex encrypted-multi-wallet format, Ouronet protocol accounts and tokens. Depends on @stoachain/stoa-core for chain-generic infrastructure (signing, wallet, crypto, network, etc.).",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./constants": {
+      "types": "./dist/constants/index.d.ts",
+      "import": "./dist/constants/index.js"
+    },
+    "./codex": {
+      "types": "./dist/codex/index.d.ts",
+      "import": "./dist/codex/index.js"
+    },
+    "./pact": {
+      "types": "./dist/pact/index.d.ts",
+      "import": "./dist/pact/index.js"
+    },
+    "./interactions": {
+      "types": "./dist/interactions/index.d.ts",
+      "import": "./dist/interactions/index.js"
+    },
+    "./interactions/*": {
+      "types": "./dist/interactions/*.d.ts",
+      "import": "./dist/interactions/*.js"
+    }
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:watch": "vitest",
+    "clean": "rimraf dist"
+  },
+  "peerDependencies": {
+    "@stoachain/kadena-stoic-legacy": "4.3.6",
+    "@stoachain/stoa-core": "4.3.6"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OuroborosNetwork/ouronet-libs.git",
+    "directory": "packages/ouronet-core"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "license": "UNLICENSED"
+}

@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // The other 3 packages use `["ES2023"]` only because they're
+    // framework-agnostic Node-runnable libraries (no DOM surface).
+    // ouronet-codex ships browser-side adapters (LocalStorageCodexAdapter
+    // touches window.localStorage) + React components — both need the
+    // "dom" lib for typing. Runtime browser-only safety is enforced by
+    // each adapter's `assertBrowser()` guard which throws CodexAdapterError
+    // when called from a non-browser context.
+    "lib": ["ES2023", "DOM"],
+    "jsx": "react-jsx"
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx"],
+  "exclude": ["node_modules", "dist"]
+}

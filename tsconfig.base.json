@@ -1,0 +1,46 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "lib": ["ES2023"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+
+    "strict": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "skipLibCheck": true,
+
+    "noEmit": true,
+    "declaration": true,
+    "declarationMap": false,
+    "sourceMap": false,
+
+    "baseUrl": ".",
+    "paths": {
+      "@ouronet/ouronet-core": ["./packages/ouronet-core/src/index.ts"],
+      "@ouronet/ouronet-core/constants": ["./packages/ouronet-core/src/constants/index.ts"],
+      "@ouronet/ouronet-core/codex": ["./packages/ouronet-core/src/codex/index.ts"],
+      "@ouronet/ouronet-core/pact": ["./packages/ouronet-core/src/pact/index.ts"],
+      "@ouronet/ouronet-core/interactions": ["./packages/ouronet-core/src/interactions/index.ts"],
+      "@ouronet/ouronet-core/interactions/*": ["./packages/ouronet-core/src/interactions/*.ts"],
+      "@ouronet/ouronet-codex": ["./packages/ouronet-codex/src/index.ts"],
+      "@ouronet/ouronet-codex/adapters": ["./packages/ouronet-codex/src/adapters/index.ts"],
+      "@ouronet/ouronet-codex/provider": ["./packages/ouronet-codex/src/provider/index.ts"],
+      "@ouronet/ouronet-codex/hooks": ["./packages/ouronet-codex/src/hooks/index.ts"],
+      "@ouronet/ouronet-codex/components": ["./packages/ouronet-codex/src/components/index.ts"],
+      "@ouronet/ouronet-codex/resolver": ["./packages/ouronet-codex/src/resolver/index.ts"],
+      "@ouronet/ouronet-codex/errors": ["./packages/ouronet-codex/src/errors/index.ts"],
+      "@ouronet/ouronet-codex/types": ["./packages/ouronet-codex/src/types/index.ts"],
+      "@ouronet/ouronet-codex/google-drive": ["./packages/ouronet-codex/src/google-drive/index.ts"],
+      "@ouronet/ouronet-codex/state": ["./packages/ouronet-codex/src/state/index.ts"],
+      "@ouronet/ouronet-codex/codex-identity": ["./packages/ouronet-codex/src/codex-identity/index.ts"],
+      "@ouronet/ouronet-codex/ui": ["./packages/ouronet-codex/src/ui/index.ts"],
+      "@ouronet/ouronet-codex/zbom": ["./packages/ouronet-codex/src/zbom/index.ts"]
+    }
+  }
+}
