@@ -138,7 +138,29 @@ jobs:
           else
             npm publish --workspace=@ouronet/ouronet-codex --access public --provenance
           fi
-          npm dist-tag add @ouronet/ouronet-codex@${V} latest
+
+          # `npm publish` already points `latest` at this version. This step
+          # exists only to PROMOTE a version that was published under some other
+          # dist-tag, so it must not fail the release when there is nothing to
+          # promote. On a first publish under a new scope the registry needs a
+          # few minutes to serve the packument, and an immediate `dist-tag add`
+          # 404s on a package that demonstrably just published — that raced here
+          # on 0.5.7 and turned a good release red.
+          for attempt in 1 2 3 4 5 6; do
+            CURRENT=$(npm view @ouronet/ouronet-codex dist-tags.latest 2>/dev/null || true)
+            if [ "$CURRENT" = "$V" ]; then
+              echo "latest already points at ${V} — nothing to promote."
+              exit 0
+            fi
+            if [ -n "$CURRENT" ]; then
+              echo "latest is ${CURRENT}; promoting ${V}."
+              npm dist-tag add @ouronet/ouronet-codex@${V} latest
+              exit 0
+            fi
+            echo "attempt ${attempt}: registry has not served the package yet; waiting 30s."
+            sleep 30
+          done
+          echo "::warning::Could not confirm the dist-tag within 3 minutes. The publish itself succeeded; verify 'npm view @ouronet/ouronet-codex dist-tags' once the registry catches up."
 
       - name: Create GitHub Release for the pushed tag
         env:
