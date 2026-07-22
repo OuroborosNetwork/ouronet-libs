@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import type { SeedType as StoaSeedType } from "@stoachain/stoa-core/wallet";
@@ -25,8 +25,14 @@ describe("REQ-13: SeedType single canonical declaration", () => {
     expect(ok).toBe(true);
   });
 
-  it("canonical SeedType lives at packages/stoa-core/src/wallet/types.ts", () => {
-    const file = readFileSync(resolve(repoRoot, "packages/stoa-core/src/wallet/types.ts"), "utf8");
-    expect(file).toMatch(/export type SeedType\s*=/);
+  // The canonical declaration now lives across a published package boundary, in
+  // stoa-js. We assert it through the INSTALLED dependency's type declarations
+  // rather than a sibling source path — that is the same surface a consumer
+  // sees, so it stays honest about what we actually depend on. stoa-js locks
+  // the source-side half in its own tests/v4-1-1-seed-type-canonical.test.ts.
+  it("canonical SeedType is declared by the installed @stoachain/stoa-core", () => {
+    const dts = resolve(repoRoot, "node_modules/@stoachain/stoa-core/dist/wallet/types.d.ts");
+    expect(existsSync(dts), `expected stoa-core type declarations at ${dts}`).toBe(true);
+    expect(readFileSync(dts, "utf8")).toMatch(/(export )?(declare )?type SeedType\s*=/);
   });
 });

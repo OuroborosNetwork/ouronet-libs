@@ -21,10 +21,10 @@ describe("REQ-05: @ouronet/ouronet-core package metadata invariants", () => {
     expect(pkg.version).toMatch(/^\d+\.\d+\.\d+$/);
   });
 
-  it("repository.url is a github.com StoaChain URL", () => {
+  it("repository.url is a github.com OuroborosNetwork URL", () => {
     const url = typeof pkg.repository === "string" ? pkg.repository : pkg.repository?.url;
     expect(url).toBeDefined();
-    expect(url).toMatch(/github\.com[/:]StoaChain\//);
+    expect(url).toMatch(/github\.com[/:]OuroborosNetwork\//);
   });
 
   it("publishConfig.access is 'public'", () => {

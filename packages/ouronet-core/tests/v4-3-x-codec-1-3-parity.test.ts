@@ -99,7 +99,7 @@ function make13Envelope(foreignKeys?: unknown): Record<string, unknown> {
 describe("(1) 1.2 GOLDEN REPLAY — ouronet-core deserializes the SHARED GOLDEN_12_WIRE field-complete", () => {
   it("parses the frozen 1.2 golden with every top-level field present (parity with codex-core's row 1b)", () => {
     const source = JSON.parse(GOLDEN_12_WIRE);
-    const parsed = deserializeCodex(GOLDEN_12_WIRE) as Record<string, unknown>;
+    const parsed = deserializeCodex(GOLDEN_12_WIRE) as unknown as Record<string, unknown>;
     expect(parsed.version).toBe("1.2");
     expect(parsed.exportedAt).toBe(source.exportedAt);
     expect(parsed.kadenaWallets).toEqual(source.kadenaWallets);
@@ -115,7 +115,7 @@ describe("(1) 1.2 GOLDEN REPLAY — ouronet-core deserializes the SHARED GOLDEN_
 
 describe("(2) 1.2 → 1.3 FORWARD — reader accepts 1.2 golden; writer stamps 1.3 with no foreignKeys", () => {
   it("deserializes the 1.2 golden clean AND the writer stamps 1.3 (never 1.2) omitting foreignKeys", () => {
-    const parsed = deserializeCodex(GOLDEN_12_WIRE) as Record<string, unknown>;
+    const parsed = deserializeCodex(GOLDEN_12_WIRE) as unknown as Record<string, unknown>;
     expect(parsed.version).toBe("1.2");
     const exp = buildCodexExport(makeFixtureCodex());
     expect(exp.version).toBe("1.3");
@@ -129,7 +129,7 @@ describe("(3) 1.3 ROUND-TRIP — build → serialize → deserialize with no for
   it("round-trips a 1.3 export whose result has NO foreignKeys property", () => {
     const codex = makeFixtureCodex();
     const json = serializeCodex(codex);
-    const parsed = deserializeCodex(json) as Record<string, unknown>;
+    const parsed = deserializeCodex(json) as unknown as Record<string, unknown>;
     expect(parsed.version).toBe("1.3");
     expect(parsed).not.toHaveProperty("foreignKeys");
     expect(parsed.kadenaWallets).toEqual(codex.kadenaWallets);
