@@ -22,7 +22,7 @@ So the dependency direction is one-way: **ouronet-libs → stoa-js**, never the 
 ## Renamed from `@stoachain/*`
 
 These packages were previously published under the StoaChain scope. The version lines continue
-unbroken across the rename:
+across the rename:
 
 | Was | Now |
 |---|---|
@@ -31,6 +31,12 @@ unbroken across the rename:
 
 The old names are deprecated on npm and point here. Consumers should install the `@ouronet/*`
 names; the old ones receive no further releases.
+
+> ⚠️ `@ouronet/ouronet-core@4.3.6` and `@4.3.7` are **not** byte-identical to
+> `@stoachain/ouronet-core@4.3.6`: they were built from `stoa-js`'s `main`, which carried
+> unreleased codex-**1.3** work. The old version writes codex `"1.2"`, these write `"1.3"`.
+> For codex-writing consumers that is a behaviour change rather than a rename. See CLAUDE.md
+> for the full description and the proposed repair.
 
 ## Develop
 

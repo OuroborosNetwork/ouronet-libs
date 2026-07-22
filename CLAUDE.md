@@ -35,7 +35,15 @@ So when stoa-js ships X.Y.Z, ship `ouronet-core` with its peers moved to X.Y.Z i
 | `@stoachain/ouronet-core` | `@ouronet/ouronet-core` |
 | `@stoachain/ouronet-codex` | `@ouronet/ouronet-codex` |
 
-The version lines continue unbroken across the rename (core resumed at `4.3.6`, codex at `0.5.7`). The old names are deprecated on npm and point here; they receive no further releases. Never reintroduce a `@stoachain/ouronet-*` import — those specifiers are dead.
+The version lines continue across the rename (core resumed at `4.3.6`, codex at `0.5.7`). The old names are deprecated on npm and point here; they receive no further releases. Never reintroduce a `@stoachain/ouronet-*` import — those specifiers are dead.
+
+> ⚠️ **Known defect in `@ouronet/ouronet-core@4.3.6` and `@4.3.7` — resolve before moving codex-writing consumers.**
+>
+> These were built from `stoa-js`'s `main`, which contained **unreleased codex-1.3 work**. `@stoachain/ouronet-core@4.3.6` writes codex `"1.2"`; the `@ouronet` versions bearing the same number write `"1.3"`. Same version, different behaviour — the rename was not behaviour-preserving, contrary to what those releases' notes claimed.
+>
+> This matters because `@ancientpantheon/codex` has a deliberate frozen-1.2 gate that *rejects* 1.3 (D-phase is not ready), so an app on this core can write backups Codex refuses to read. There is currently **no 1.2-only version under the `@ouronet` scope**.
+>
+> The likely repair is to publish the 1.3 work honestly as a minor (`4.4.0`) and deprecate 4.3.6/4.3.7 as mislabelled — but publishing 4.4.0 auto-upgrades anyone on a `^4.3.x` range into the 1.3 writer, so it is not a neutral act and needs a deliberate call.
 
 ## Common commands
 

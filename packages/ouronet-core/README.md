@@ -5,14 +5,21 @@ Ouronet protocol business logic on top of [`@stoachain/stoa-core`](https://www.n
 Chain-generic infrastructure (signing, wallet, crypto, network failover, gas, guard, errors, observability, dalos, reads, pact-format helpers) lives in the sibling [`@stoachain/stoa-core`](https://www.npmjs.com/package/@stoachain/stoa-core) package — install both, or just this one if you only need the Ouronet-specific surface.
 
 > **Renamed.** This package was published as `@stoachain/ouronet-core` through 4.3.5. The
-> code, version line, and release history continue unbroken under the `@ouronet` scope —
+> version line and release history continue under the `@ouronet` scope —
 > the published name now matches the organisation that owns it. The old name is deprecated
-> on npm and points here. Migration is a rename and nothing else:
+> on npm and points here. At the import level, migration is a rename:
 >
 > ```diff
 > - import { serializeCodex } from "@stoachain/ouronet-core/codex";
 > + import { serializeCodex } from "@ouronet/ouronet-core/codex";
 > ```
+>
+> ⚠️ **But 4.3.6/4.3.7 here are NOT byte-identical to `@stoachain/ouronet-core@4.3.6`.**
+> This package was built from the source repo's `main`, which carried codex-**1.3**
+> work that had never been released. The old 4.3.6 writes codex `"1.2"`; these
+> versions write `"1.3"`. If you consume the codex writer, that is a behaviour
+> change, not a rename — verify against your reader before upgrading. Resolving
+> this mislabelling is tracked as an open issue.
 
 ## Status
 
