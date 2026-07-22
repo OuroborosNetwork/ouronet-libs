@@ -4,6 +4,31 @@ All notable changes to `@ouronet/ouronet-core`.
 
 This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3.3.8. v4.0.0 split it into a two-package npm workspace under `StoaChain/stoa-js` — chain-generic infrastructure moved out into [`@stoachain/stoa-core`](https://www.npmjs.com/package/@stoachain/stoa-core), this package retained the Ouronet-specific business logic. The `4.0.0` heading below is the first release after the split.
 
+## 4.4.0 — 2026-07-22
+
+**MINOR — the codex writer is held at `"1.2"` while the reader keeps accepting `"1.2"` and `"1.3"`.**
+
+### Read this before upgrading from 4.3.6 or 4.3.7
+
+Those two releases were a mistake, and this one corrects it. They were built from the source repo's `main`, which carried codex-**1.3** writer work that had never been released, and they were published under version numbers the old `@stoachain/ouronet-core` had already used. So `@stoachain/ouronet-core@4.3.6` and `@ouronet/ouronet-core@4.3.6` are the same number with **different behaviour**: the first writes codex `"1.2"`, the second writes `"1.3"`.
+
+That matters because the format bump is governed by reader-before-writer discipline — the reader is widened everywhere first, and only then does the writer advance. Shipping a 1.3 writer skipped that step: an app on 4.3.6/4.3.7 produces backups that any app still on a 1.2-only reader cannot open, including `@ancientpantheon/codex`, which deliberately gates on 1.2 until its D-phase is ready.
+
+### What 4.4.0 does
+
+- The **reader still accepts both** `"1.2"` and `"1.3"` — no narrowing, ever. Any 1.3 file already written by 4.3.6/4.3.7 remains readable.
+- The **writer stamps `"1.2"`** again, so nothing new is produced that the rest of the ecosystem cannot read.
+- Nothing is lost by this. ouronet's `PlaintextCodex` has no foreign-key source field, so the writer never emitted the 1.3-only `foreignKeys` block — its 1.2 and 1.3 output differed only in the version string.
+- It is a MINOR, not a patch, because the reader's widened acceptance is genuinely new surface relative to the last honest release.
+
+`@ouronet/ouronet-core@4.3.6` and `@4.3.7` are deprecated on npm and point here.
+
+### Advancing the writer later
+
+Confirm every consumer resolves a 1.3-capable reader (4.3.6+ under this scope) and that `@ancientpantheon/codex` no longer rejects 1.3, then flip the single `version` literal in `src/codex/codec.ts` and ship it as another MINOR. `tests/v4-3-x-codec-1-3-writer.test.ts` documents that procedure and holds the invariant either way — its round-trip cases are version-agnostic on purpose.
+
+**787 specs pass.**
+
 ## 4.3.7 — 2026-07-22
 
 **PATCH — chain-peer realignment, no code change.**

@@ -111,26 +111,27 @@ describe("(1) 1.2 GOLDEN REPLAY — ouronet-core deserializes the SHARED GOLDEN_
   });
 });
 
-// ─── (2) 1.2 → 1.3 FORWARD — writer stamps 1.3, omits foreignKeys ──────────────
+// ─── (2) READER AHEAD OF WRITER — reads 1.2 golden, writes 1.2, omits foreignKeys ─
 
-describe("(2) 1.2 → 1.3 FORWARD — reader accepts 1.2 golden; writer stamps 1.3 with no foreignKeys", () => {
-  it("deserializes the 1.2 golden clean AND the writer stamps 1.3 (never 1.2) omitting foreignKeys", () => {
+describe("(2) READER AHEAD OF WRITER — reader accepts the 1.2 golden; writer stamps 1.2 with no foreignKeys", () => {
+  it("deserializes the 1.2 golden clean AND the writer stamps 1.2, omitting foreignKeys", () => {
     const parsed = deserializeCodex(GOLDEN_12_WIRE) as unknown as Record<string, unknown>;
     expect(parsed.version).toBe("1.2");
     const exp = buildCodexExport(makeFixtureCodex());
-    expect(exp.version).toBe("1.3");
+    expect(exp.version).toBe("1.2");
     expect(exp).not.toHaveProperty("foreignKeys");
   });
 });
 
-// ─── (3) 1.3 ROUND-TRIP (no foreign keys) ─────────────────────────────────────
+// ─── (3) WRITER ROUND-TRIP (no foreign keys) ──────────────────────────────────
 
-describe("(3) 1.3 ROUND-TRIP — build → serialize → deserialize with no foreign keys", () => {
-  it("round-trips a 1.3 export whose result has NO foreignKeys property", () => {
+describe("(3) WRITER ROUND-TRIP — build → serialize → deserialize with no foreign keys", () => {
+  it("round-trips a freshly written export whose result has NO foreignKeys property", () => {
     const codex = makeFixtureCodex();
     const json = serializeCodex(codex);
     const parsed = deserializeCodex(json) as unknown as Record<string, unknown>;
-    expect(parsed.version).toBe("1.3");
+    // Version-agnostic: guards the round-trip itself, not the current position.
+    expect(parsed.version).toBe(JSON.parse(json).version);
     expect(parsed).not.toHaveProperty("foreignKeys");
     expect(parsed.kadenaWallets).toEqual(codex.kadenaWallets);
     expect(parsed.ouronetWallets).toEqual(codex.ouronetWallets);

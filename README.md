@@ -6,7 +6,7 @@ reorganisation so that package identity matches org ownership.
 
 | Package | Version | What it is |
 |---|---|---|
-| [`@ouronet/ouronet-core`](./packages/ouronet-core) | `4.3.6` | Ouronet protocol business logic |
+| [`@ouronet/ouronet-core`](./packages/ouronet-core) | `4.4.0` | Ouronet protocol business logic |
 | [`@ouronet/ouronet-codex`](./packages/ouronet-codex) | `0.5.7` | Modular React Codex layer for consumer apps |
 
 ## Relationship to stoa-js
@@ -32,11 +32,10 @@ across the rename:
 The old names are deprecated on npm and point here. Consumers should install the `@ouronet/*`
 names; the old ones receive no further releases.
 
-> ⚠️ `@ouronet/ouronet-core@4.3.6` and `@4.3.7` are **not** byte-identical to
-> `@stoachain/ouronet-core@4.3.6`: they were built from `stoa-js`'s `main`, which carried
-> unreleased codex-**1.3** work. The old version writes codex `"1.2"`, these write `"1.3"`.
-> For codex-writing consumers that is a behaviour change rather than a rename. See CLAUDE.md
-> for the full description and the proposed repair.
+> ⚠️ `@ouronet/ouronet-core@4.3.6` and `@4.3.7` were mispublished — they carried an unreleased
+> codex-**1.3 writer** and reused version numbers the old `@stoachain` package already had. Both are
+> deprecated. Use **4.4.0+**, which keeps the widened reader (1.2 and 1.3) and returns the writer to
+> 1.2 until the whole ecosystem can read 1.3.
 
 ## Develop
 
@@ -53,7 +52,7 @@ Push a version tag matching the package you're shipping — the two carry **inde
 lines, so one tag ships one package:
 
 ```sh
-git tag -a v4.3.6 -m "…"   # → publishes @ouronet/ouronet-core
+git tag -a v4.4.0 -m "…"   # → publishes @ouronet/ouronet-core
 git tag -a v0.5.7 -m "…"   # → publishes @ouronet/ouronet-codex
 git push origin --tags
 ```

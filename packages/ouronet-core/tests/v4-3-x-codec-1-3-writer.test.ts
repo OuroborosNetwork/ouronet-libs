@@ -1,18 +1,28 @@
 /**
- * Writer flip: buildCodexExport / serializeCodex must stamp the "1.3" envelope
- * version, matching the reader D1 already widened to accept.
+ * Writer/reader version contract for the codex envelope.
  *
  * FUNDS-CRITICAL. This is the LIVE writer path (useCodexBackup → serializeCodex
- * → the file a user downloads and later restores). The reader in THIS file was
- * widened first (deserializeCodex accepts {"1.2","1.3"}); flipping the writer to
- * emit "1.3" without that widen would be a funds-loss inversion. The precondition
- * is enforced by the (D1-widened) round-trip assertion below: a freshly written
- * envelope must deserialize back through this package's own reader.
+ * → the file a user downloads and later restores).
  *
- * RED phase: authored against the un-flipped writer (still stamps "1.2"). The
- * WRITER-STAMPS-1.3 case fails now (version is "1.2"); the round-trip case
- * passes now (1.2 is accepted) but pins the contract that the emitted version
- * must survive its own reader after the flip.
+ * THE INVARIANT, which is what this file really guards: the reader must stay
+ * ahead of the writer. Whatever the writer emits must deserialize through this
+ * package's own reader, or a user's own fresh backup fails to restore.
+ *
+ * Current position in the migration: the reader accepts {"1.2","1.3"}; the
+ * writer still stamps "1.2". That gap is deliberate, not an oversight. The
+ * reader half shipped, the writer half has not, because the wider ecosystem is
+ * not yet uniformly on a 1.3-capable reader — `@ancientpantheon/codex` still
+ * gates on 1.2, so a writer running ahead would produce backups the user's own
+ * other apps could not open.
+ *
+ * Since ouronet's PlaintextCodex carries no foreign-key source field, the
+ * writer never emits the 1.3-only `foreignKeys` block — so 1.2 and 1.3 output
+ * differ only in the version string, and holding at 1.2 costs no capability.
+ *
+ * WHEN THE WRITER ADVANCES TO 1.3: change the two version expectations below to
+ * "1.3". Everything else in this file — especially the round-trip and the
+ * reader-accepts-both cases — must keep passing unchanged, because those encode
+ * the invariant rather than the current position.
  */
 
 import { describe, it, expect } from "vitest";
@@ -42,44 +52,57 @@ function makeFixtureCodex(): PlaintextCodex {
   };
 }
 
-// ─── WRITER-STAMPS-1.3 (RED now — writer still stamps "1.2") ─────────────────
+// ─── CURRENT WRITER POSITION (trails the reader on purpose) ──────────────────
 
-describe("buildCodexExport stamps the 1.3 envelope version", () => {
-  it("emits version \"1.3\" — the writer contract now matches the widened reader", () => {
-    // Drives the flip: a fresh export must carry the new version literal so the
-    // downloaded backup declares the format its own reader accepts.
+describe("buildCodexExport stamps the envelope version the ecosystem can read", () => {
+  it("emits version \"1.2\" — the writer deliberately trails the widened reader", () => {
     const exp = buildCodexExport(makeFixtureCodex());
-    expect(exp.version).toBe("1.3");
+    expect(exp.version).toBe("1.2");
   });
 
-  it("serializeCodex writes a JSON whose parsed version is \"1.3\"", () => {
+  it("serializeCodex writes a JSON whose parsed version is \"1.2\"", () => {
     const json = serializeCodex(makeFixtureCodex());
-    expect(JSON.parse(json).version).toBe("1.3");
+    expect(JSON.parse(json).version).toBe("1.2");
   });
 
-  it("omits foreignKeys when the source codex has none (bare 1.3 envelope, no empty block)", () => {
-    // ouronet's PlaintextCodex has no foreignKeys source field, so the practical
-    // emission is foreignKeys-ABSENT — a mandatory empty block would be a lie the
-    // strict reader shouldn't have to allow-list on every write.
+  it("never emits foreignKeys — ouronet has no foreign-key source field", () => {
+    // A mandatory empty block would be a lie the strict reader shouldn't have to
+    // allow-list on every write. Its absence is also why holding the writer at
+    // 1.2 loses nothing: there is no 1.3-only payload to carry.
     const exp = buildCodexExport(makeFixtureCodex());
     expect(exp).not.toHaveProperty("foreignKeys");
   });
 });
 
-// ─── ROUND-TRIP THROUGH THIS PACKAGE'S OWN (D1-WIDENED) READER ───────────────
+// ─── THE INVARIANT — must hold at every point of the migration ───────────────
 
-describe("writer output round-trips through the D1-widened reader", () => {
-  it("serializeCodex → deserializeCodex yields a 1.3 envelope the reader accepts", () => {
-    // The funds-loss guard: what the LIVE writer emits must deserialize back
-    // through THIS package's reader. If the writer stamped a version the reader
-    // rejected, a user's own backup would fail to restore.
+describe("reader stays ahead of writer", () => {
+  it("whatever the writer emits round-trips through this package's own reader", () => {
+    // The funds-loss guard. Deliberately asserts the round-trip WITHOUT naming a
+    // version, so it keeps guarding after the writer advances.
     const codex = makeFixtureCodex();
     const json = serializeCodex(codex);
     const parsed = deserializeCodex(json);
-    expect((parsed as { version: string }).version).toBe("1.3");
+    expect((parsed as { version: string }).version).toBe(JSON.parse(json).version);
     expect(parsed.kadenaWallets).toEqual(codex.kadenaWallets);
     expect(parsed.ouronetWallets).toEqual(codex.ouronetWallets);
     expect(parsed.addressBook).toEqual(codex.addressBook);
     expect(parsed.uiSettings).toEqual(codex.uiSettings);
+  });
+
+  it("the reader accepts BOTH 1.2 and 1.3, so the writer can advance without a reader change", () => {
+    const codex = makeFixtureCodex();
+    const asWritten = JSON.parse(serializeCodex(codex));
+
+    // 1.2 — what the writer emits today.
+    expect(() => deserializeCodex(JSON.stringify({ ...asWritten, version: "1.2" }))).not.toThrow();
+    // 1.3 — what it will emit next, already readable.
+    expect(() => deserializeCodex(JSON.stringify({ ...asWritten, version: "1.3" }))).not.toThrow();
+  });
+
+  it("still fails closed on a version neither side understands", () => {
+    const codex = makeFixtureCodex();
+    const asWritten = JSON.parse(serializeCodex(codex));
+    expect(() => deserializeCodex(JSON.stringify({ ...asWritten, version: "1.4" }))).toThrow(/unsupported version/);
   });
 });

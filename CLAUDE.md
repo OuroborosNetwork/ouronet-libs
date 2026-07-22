@@ -37,13 +37,11 @@ So when stoa-js ships X.Y.Z, ship `ouronet-core` with its peers moved to X.Y.Z i
 
 The version lines continue across the rename (core resumed at `4.3.6`, codex at `0.5.7`). The old names are deprecated on npm and point here; they receive no further releases. Never reintroduce a `@stoachain/ouronet-*` import — those specifiers are dead.
 
-> ⚠️ **Known defect in `@ouronet/ouronet-core@4.3.6` and `@4.3.7` — resolve before moving codex-writing consumers.**
+> **Codec format position — read before touching `src/codex/codec.ts`.**
 >
-> These were built from `stoa-js`'s `main`, which contained **unreleased codex-1.3 work**. `@stoachain/ouronet-core@4.3.6` writes codex `"1.2"`; the `@ouronet` versions bearing the same number write `"1.3"`. Same version, different behaviour — the rename was not behaviour-preserving, contrary to what those releases' notes claimed.
+> The reader accepts `"1.2"` and `"1.3"`; the writer stamps `"1.2"`. That gap is deliberate: format changes follow **reader-before-writer** discipline, so the reader is widened everywhere first and the writer advances only once the whole ecosystem can read the new format. `@ancientpantheon/codex` still gates on 1.2, so a writer running ahead would produce backups the user's own apps could not open.
 >
-> This matters because `@ancientpantheon/codex` has a deliberate frozen-1.2 gate that *rejects* 1.3 (D-phase is not ready), so an app on this core can write backups Codex refuses to read. There is currently **no 1.2-only version under the `@ouronet` scope**.
->
-> The likely repair is to publish the 1.3 work honestly as a minor (`4.4.0`) and deprecate 4.3.6/4.3.7 as mislabelled — but publishing 4.4.0 auto-upgrades anyone on a `^4.3.x` range into the 1.3 writer, so it is not a neutral act and needs a deliberate call.
+> `@ouronet/ouronet-core@4.3.6` and `@4.3.7` broke that ordering — they were built from `stoa-js`'s `main`, which carried an unreleased 1.3 writer, and they reused version numbers the old `@stoachain` package already had. Both are deprecated; **4.4.0** is the corrected release. Never narrow the reader to fix a writer problem.
 
 ## Common commands
 
@@ -71,7 +69,7 @@ import { serializeCodex } from "@ouronet/ouronet-core";              // not supp
 
 ## Architectural patterns to preserve
 
-**The codex backup format is frozen at `"1.2"`.** `packages/ouronet-core/src/codex/codec.ts` — do not bump the version string. Read its JSDoc before touching the codec.
+**The codex backup format advances reader-first.** `packages/ouronet-core/src/codex/codec.ts` — the reader accepts `"1.2"` and `"1.3"`, the writer stamps `"1.2"`. Never narrow the reader, and never advance the writer to a version the ecosystem cannot yet read. Read the file's JSDoc and the codec-position note above before touching it.
 
 **Backwards-compat type duplication is intentional in places.** `IKadenaKeypair` is canonically defined in `@stoachain/stoa-core`'s signing types, but a structurally identical type still exists in `interactions/ouroFunctions` for older imports. Don't "consolidate" without checking the comment trail.
 

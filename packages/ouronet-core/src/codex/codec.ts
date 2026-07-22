@@ -4,20 +4,33 @@
  * the same backup JSON (HUB's codex-import flow, CLI recovery tools,
  * etc.).
  *
- * The written format is now `CodexExportV1_3` — the `"version": "1.3"`
- * string. This was an INTENTIONAL 1.2→1.3 bump made under strict
- * reader-before-writer discipline: `deserializeCodex` was widened to
- * accept BOTH "1.2" and "1.3" (and to allow-list the optional
- * `foreignKeys` block) BEFORE this writer began stamping "1.3". That
- * ordering is what makes the bump safe — every previously downloaded
- * `OuronetCodex_*.json` (still "1.2") keeps importing, and every new
- * export ("1.3") deserializes through the same reader.
+ * `deserializeCodex` accepts BOTH "1.2" and "1.3" (and allow-lists the
+ * optional `foreignKeys` block). The writer currently stamps **"1.2"**.
  *
- * Do NOT revert the writer to "1.2" in isolation, and do NOT narrow the
- * reader back to "1.2"-only: emitting a version the reader rejects (or
- * rejecting the version the writer emits) is a funds-loss inversion — a
- * user's own fresh backup would fail to restore. Any future format change
- * must keep the reader ahead of the writer.
+ * THE INVARIANT: the reader must stay ahead of the writer. Emitting a
+ * version the reader rejects — or rejecting the version the writer emits —
+ * is a funds-loss inversion, because a user's own fresh backup would fail
+ * to restore. The reader is therefore always widened first, in a release
+ * that ships everywhere, and only then does the writer advance.
+ *
+ * Why the writer sits at "1.2" while the reader already understands "1.3":
+ * that is the mid-point of the migration, and it is deliberate. The reader
+ * half shipped; the writer half has not, because the ecosystem is not yet
+ * uniformly on a 1.3-capable reader — `@ancientpantheon/codex` still gates
+ * on 1.2. A writer that ran ahead would produce backups that the user's own
+ * other apps could not open. That is the exact inversion above, one step
+ * removed.
+ *
+ * This writer's 1.3 output was a BARE envelope — ouronet's `PlaintextCodex`
+ * has no foreign-key source field, so no `foreignKeys` block was ever
+ * emitted. The only difference between its 1.2 and 1.3 output is the
+ * version string itself, which is why holding at "1.2" costs no capability.
+ *
+ * TO ADVANCE THE WRITER TO "1.3": confirm every consumer resolves a core
+ * whose reader accepts 1.3 (that is 4.3.6+ under the @ouronet scope), and
+ * that `@ancientpantheon/codex` no longer rejects 1.3, then flip the
+ * `version` literal below and ship it as a MINOR. Do not narrow the reader
+ * at any point.
  *
  * All pure. No password handling in here — the BYTES INSIDE the JSON are
  * already encrypted at the codex-entry level (each wallet's `secret` field
@@ -34,19 +47,20 @@ import { CodexUnknownFieldError } from "./errors.js";
 
 /**
  * Build a codex-export payload from a PlaintextCodex. Stamps the current
- * `"1.3"` envelope version and `exportedAt` with the current ISO time.
+ * `"1.2"` envelope version and `exportedAt` with the current ISO time.
  * Returns the object — the caller stringifies it (so callers in a
  * memory-constrained environment can stream it out instead of holding the
  * whole string in RAM).
  *
- * The return type is the `CodexExportV1_2 | CodexExportV1_3` union so
- * consumers written against the historical 1.2 shape still type-check
- * against the widened output; the runtime value is always a 1.3 envelope.
+ * The return type is the `CodexExportV1_2 | CodexExportV1_3` union so this
+ * signature does not have to change when the writer advances to 1.3; the
+ * runtime value today is a 1.2 envelope. See the file header for why the
+ * writer trails the reader and what has to be true before it advances.
  *
- * The optional `foreignKeys` block is EMITTED only when the source codex
- * carries foreign keys. ouronet's `PlaintextCodex` has no foreign-key
- * source field today, so the practical output is a bare 1.3 envelope with
- * `foreignKeys` omitted — no mandatory empty block.
+ * The optional `foreignKeys` block belongs to the 1.3 shape and is never
+ * emitted here — ouronet's `PlaintextCodex` has no foreign-key source
+ * field — so the output carries no 1.3-only data and nothing is lost by
+ * stamping 1.2.
  *
  * Fields left out intentionally: `pureKeypairs`, `schemaVersion`,
  * `lastUpdatedAt`, `lastUpdatedDevice` — see CodexExportV1_3 JSDoc for
@@ -58,7 +72,7 @@ export function buildCodexExport<
   codex: PlaintextCodex<KS, OA, PK, AB, UI>,
 ): CodexExportV1_2<KS, OA, AB, UI> | CodexExportV1_3<KS, OA, AB, UI> {
   return {
-    version: "1.3",
+    version: "1.2",
     exportedAt: new Date().toISOString(),
     kadenaWallets: codex.kadenaWallets,
     ouronetWallets: codex.ouronetWallets,
@@ -68,7 +82,7 @@ export function buildCodexExport<
 }
 
 /**
- * Stringify a PlaintextCodex into the `"1.3"` backup JSON format, the
+ * Stringify a PlaintextCodex into the `"1.2"` backup JSON format, the
  * exact output of OuronetUI's LocalStorageCodexAdapter.downloadAsJson.
  * Pretty-prints with 2-space indent because the file lands on disk and
  * a human occasionally opens it to sanity-check account addresses.
@@ -90,7 +104,7 @@ export function serializeCodex<
  * Throws on:
  *   - invalid JSON
  *   - missing `"version"` field (malformed)
- *   - version mismatch (not `"1.2"`)
+ *   - version mismatch (neither `"1.2"` nor `"1.3"`)
  *   - shape mismatch (kadenaWallets, ouronetWallets, addressBook not arrays; uiSettings not an object)
  *
  * The version check exists to fail-fast rather than silently mis-decoding
