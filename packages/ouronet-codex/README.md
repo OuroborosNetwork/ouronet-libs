@@ -2,6 +2,16 @@
 
 > Modular React Codex for the Ouronet ecosystem — drop-in `<CodexProvider>` + hooks + headless components giving any React consumer (OuronetUI, AncientHoldings hub, future apps) full 1:1 Codex functionality without re-implementing it.
 
+> **Renamed.** This package was published as `@stoachain/ouronet-codex` through 0.5.6. The
+> code, version line, and release history continue unbroken under the `@ouronet` scope —
+> the published name now matches the organisation that owns it. The old name is deprecated
+> on npm and points here. Migration is a rename and nothing else:
+>
+> ```diff
+> - import { CodexProvider } from "@stoachain/ouronet-codex";
+> + import { CodexProvider } from "@ouronet/ouronet-codex";
+> ```
+
 ## Status
 
 **`0.5.7` on public npmjs** — Released 2026-06-20. **Patch — the codex unlock window is now absolute, not sliding.** `useEnsureCodexUnlocked` re-authenticated on every call (including cache hits where the codex was already unlocked), so each operation silently reset the TTL and the "re-authenticate in X" countdown never elapsed while active. The gate now only (re)starts the window on a fresh locked → unlocked authentication; a routine cache hit leaves the countdown counting straight down from the original unlock. No API changes.

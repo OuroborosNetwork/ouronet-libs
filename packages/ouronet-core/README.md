@@ -4,6 +4,16 @@ Ouronet protocol business logic on top of [`@stoachain/stoa-core`](https://www.n
 
 Chain-generic infrastructure (signing, wallet, crypto, network failover, gas, guard, errors, observability, dalos, reads, pact-format helpers) lives in the sibling [`@stoachain/stoa-core`](https://www.npmjs.com/package/@stoachain/stoa-core) package — install both, or just this one if you only need the Ouronet-specific surface.
 
+> **Renamed.** This package was published as `@stoachain/ouronet-core` through 4.3.5. The
+> code, version line, and release history continue unbroken under the `@ouronet` scope —
+> the published name now matches the organisation that owns it. The old name is deprecated
+> on npm and points here. Migration is a rename and nothing else:
+>
+> ```diff
+> - import { serializeCodex } from "@stoachain/ouronet-core/codex";
+> + import { serializeCodex } from "@ouronet/ouronet-core/codex";
+> ```
+
 ## Status
 
 **`4.3.6` on public npmjs** — **PATCH (atomic-triplet alignment with `@stoachain/stoa-core@4.3.6` + `@stoachain/kadena-stoic-legacy@4.3.6`).** Released 2026-06-11. NO code changes in this package; version bumped solely to maintain the atomic-triplet invariant. The v4.3.6 change (a `@stoachain/stoa-core` auto-gas-limit floor fix in `calculateAutoGasLimit`) lives entirely in `@stoachain/stoa-core`. Functionally identical to `4.3.5`. **829 specs pass.**
