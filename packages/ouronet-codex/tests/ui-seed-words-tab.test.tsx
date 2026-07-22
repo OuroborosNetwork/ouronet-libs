@@ -201,6 +201,14 @@ describe("<SeedWordsTab>", () => {
     fireEvent.click(within(card).getByRole("button", { name: /view seed words/i }));
 
     // The plaintext mnemonic surfaces — proving the codex password decrypted it.
-    expect(await screen.findByText(phrase)).toBeTruthy();
+    //
+    // Longer timeout than the 1000ms default on purpose: unlike the other
+    // findBy* waits in this file, this one gates on a REAL V2 decryption, and
+    // the V2 envelope uses a deliberately expensive KDF. The whole test runs
+    // ~1.6s on a dev machine, so a slower CI runner routinely exceeds the
+    // default and fails here with "unable to find the text" — which reads like
+    // a rendering bug rather than the timeout it actually is. This is what
+    // failed the v4.4.0 publish.
+    expect(await screen.findByText(phrase, {}, { timeout: 15_000 })).toBeTruthy();
   });
 });
