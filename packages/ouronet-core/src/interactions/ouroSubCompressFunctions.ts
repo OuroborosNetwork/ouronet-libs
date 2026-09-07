@@ -3,7 +3,7 @@
  * Sublimate (OURO -> IGNIS) and compress (IGNIS -> OURO) execution + preview/info reads.
  */
 
-import { calculateAutoGasLimit } from "@stoachain/stoa-core/gas";
+import { calculateAutoGasLimit, stoaGasMeta } from "@stoachain/stoa-core/gas";
 import {
   KADENA_CHAIN_ID,
   KADENA_NAMESPACE, STOA_AUTONOMIC_OURONETGASSTATION,
@@ -44,7 +44,7 @@ export async function sublimateOuroToIgnis(
       })
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride || gasLimit,
       })
@@ -132,7 +132,7 @@ export async function compressIgnisToOuro(
       })
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride || gasLimit,
       })

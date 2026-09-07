@@ -3,7 +3,7 @@
  * Single-token DPTF transfer execution via TS01-C1.DPTF|C_Transfer.
  */
 
-import { calculateAutoGasLimit } from "@stoachain/stoa-core/gas";
+import { calculateAutoGasLimit, stoaGasMeta } from "@stoachain/stoa-core/gas";
 import {
   KADENA_CHAIN_ID,
   KADENA_NAMESPACE, STOA_AUTONOMIC_OURONETGASSTATION,
@@ -38,7 +38,7 @@ export async function transferToken(
       .execution(`(${KADENA_NAMESPACE}.TS01-C1.DPTF|C_Transfer "${patronAccount.address}" "${tokenId}" "${senderAccount}" "${receiverAccount}" ${decimalAmount} ${method})`)
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride || gasLimit,
       })

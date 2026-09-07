@@ -11,7 +11,7 @@ import { Pact } from "@stoachain/kadena-stoic-legacy/client";
 import { getFailoverClient } from "@stoachain/stoa-core/network";
 import { pactRead } from "@stoachain/stoa-core/reads";
 import { universalSignTransaction, fromKeypair } from "@stoachain/stoa-core/signing";
-import { calculateAutoGasLimit } from "@stoachain/stoa-core/gas";
+import { calculateAutoGasLimit, stoaGasMeta } from "@stoachain/stoa-core/gas";
 import { createSimulationError, logDetailedError } from "@stoachain/stoa-core/errors";
 import { getLogger } from "@stoachain/stoa-core/observability";
 import { safeCreationTime } from "@stoachain/stoa-core/pact";
@@ -192,7 +192,7 @@ export async function executeDeployStandardAccount(
       .addData("ks", { keys: guardKeys, pred: guardPred })
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId:       KADENA_CHAIN_ID,
         gasLimit:      effectiveGasLimit,
       })

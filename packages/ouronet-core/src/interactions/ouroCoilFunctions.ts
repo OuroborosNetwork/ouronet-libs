@@ -5,7 +5,7 @@
  * comment "Export new coiling functions for AURYN and WSTOA" places them in the coil domain).
  */
 
-import { calculateAutoGasLimit } from "@stoachain/stoa-core/gas";
+import { calculateAutoGasLimit, stoaGasMeta } from "@stoachain/stoa-core/gas";
 import {
   KADENA_CHAIN_ID,
   KADENA_NAMESPACE, STOA_AUTONOMIC_OURONETGASSTATION,
@@ -136,7 +136,7 @@ export async function curlOuroToEliteAuryn(
       })
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride || gasLimit,
       })
@@ -237,7 +237,7 @@ export async function coilOuroToAuryn(
       })
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride || gasLimit,
       })

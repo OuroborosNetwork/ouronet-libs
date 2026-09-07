@@ -1,4 +1,4 @@
-import { calculateAutoGasLimit } from "@stoachain/stoa-core/gas";
+import { calculateAutoGasLimit, stoaGasMeta } from "@stoachain/stoa-core/gas";
 import {
   KADENA_CHAIN_ID,
   KADENA_NAMESPACE, STOA_AUTONOMIC_OURONETGASSTATION,
@@ -317,7 +317,7 @@ async function executeLiquidityOp(opts: LiquidityOpInput): Promise<any> {
       })
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride ?? defaultGasLimit,
       })

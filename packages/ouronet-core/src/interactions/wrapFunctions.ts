@@ -5,7 +5,7 @@
 
 import { Pact } from "@stoachain/kadena-stoic-legacy/client";
 import { getFailoverClient } from "@stoachain/stoa-core/network";
-import { calculateAutoGasLimit } from "@stoachain/stoa-core/gas";
+import { calculateAutoGasLimit, stoaGasMeta } from "@stoachain/stoa-core/gas";
 import {
   KADENA_CHAIN_ID,
   KADENA_NAMESPACE,
@@ -111,7 +111,7 @@ export async function executeWrapStoa(params: WrapStoaParams): Promise<any> {
       )
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride ?? 2_000_000,
       })
@@ -132,7 +132,7 @@ export async function executeWrapStoa(params: WrapStoaParams): Promise<any> {
         )
         .setMeta({
           senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
           chainId: KADENA_CHAIN_ID,
           gasLimit: gasLimitOverride ?? 2_000_000,
         })
@@ -248,7 +248,7 @@ export async function executeWrapUrStoa(params: WrapUrStoaParams): Promise<any> 
       )
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride ?? 2_000_000,
       })

@@ -12,7 +12,7 @@ import {
 import { Pact } from "@stoachain/kadena-stoic-legacy/client";
 import { getFailoverClient } from "@stoachain/stoa-core/network";
 import { universalSignTransaction, fromKeypair } from "@stoachain/stoa-core/signing";
-import { calculateAutoGasLimit } from "@stoachain/stoa-core/gas";
+import { calculateAutoGasLimit, stoaGasMeta } from "@stoachain/stoa-core/gas";
 import { pactRead } from "@stoachain/stoa-core/reads";
 import { safeCreationTime } from "@stoachain/stoa-core/pact";
 import type {
@@ -139,7 +139,7 @@ export async function executeSmartSwapWithSlippage(
         .addData("slippage-bounds", slippageObj as any)
         .setMeta({
           senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
           chainId: KADENA_CHAIN_ID,
           gasLimit: gasLimitOverride ?? gasLimit,
         })
@@ -198,7 +198,7 @@ export async function executeSmartSwapNoSlippage(
         })
         .setMeta({
           senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
           chainId: KADENA_CHAIN_ID,
           gasLimit: gasLimitOverride ?? gasLimit,
         })

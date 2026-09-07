@@ -4,6 +4,78 @@ All notable changes to `@ouronet/ouronet-core`.
 
 This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3.3.8. v4.0.0 split it into a two-package npm workspace under `StoaChain/stoa-js` — chain-generic infrastructure moved out into [`@stoachain/stoa-core`](https://www.npmjs.com/package/@stoachain/stoa-core), this package retained the Ouronet-specific business logic. The `4.0.0` heading below is the first release after the split.
 
+## 4.6.0 — 2026-09-07
+
+**MINOR — chain peers re-pinned to 4.4.0; every transaction in the package now prices against the live Yin floor.**
+
+### Chain peers
+
+`@stoachain/stoa-core` and `@stoachain/kadena-stoic-legacy` move `4.3.7` → **`4.4.0`** (exact,
+as always — the root `devDependencies` move with them). stoa-core 4.4.0 is what makes the rest
+of this release possible: it ships the **canonical Yin Engine** at `@stoachain/stoa-core/gas`
+(`stoaGasMeta`, `minGasPriceAnu`, `anuToStoaNumber`, and the four constants).
+
+### The bug, in full
+
+The Yin Engine is StoaChain's live minimum gas price: 10,000 ANU at genesis
+(2026-02-23T18:00:00Z), +1 ANU every 3 hours, capped at 400,000 ANU. A transaction priced below
+the floor as of its own `creationTime` is rejected by chainweb-node.
+
+Every `setMeta` call in this package set `creationTime` and nothing else, so the vendored client
+supplied its own `gasPrice` default of `1.0e-8` — which is *exactly* the genesis floor. From the
+floor's first tick onward, **every transaction this package built was underpriced**. Paying via
+the Ouronet Gas Station is no exemption: `DALOS.GAS_PAYER` decides who pays, not how little, and
+the chain-wide minimum-price rule is evaluated before the payer guard runs.
+
+4.5.0 fixed the four cross-chain sites; 4.5.1 fixed the two rotation executors. This release
+fixes the remaining **32 sites across 15 files** and unifies all 38 on one implementation.
+(4.5.1's changelog said "17 other files" — the accurate count is 15 files / 32 sites.)
+
+Newly priced: `activateFunctions`, `addLiquidityFunctions`, `coilFunctions`,
+`dexSwapPairExecuteFunctions`, `dexSwapPairSmartSwapFunctions`, `kpayFunctions`,
+`ouroCoilFunctions`, `ouroMovieBoosterFunctions`, `ouroSubCompressFunctions`,
+`ouroTransferFunctions`, `ouroUrStoaFunctions`, `ouroWrapFunctions`, `pensionFunctions`,
+`urStoaFunctions`, `wrapFunctions`.
+
+### One implementation, not four
+
+`crossChainFunctions.ts` (4.5.0), `guardFunctions.ts` and `ouroRotateFunctions.ts` (4.5.1) each
+carried a **local copy** of the formula, written before stoa-core had it. All three copies are
+deleted; every site now calls the canonical helper. The package contains no local
+re-implementation of the Yin formula, and `v4-6-0-gas-price-invariant.test.ts` fails if one
+reappears.
+
+### The call is `stoaGasMeta(safeCreationTime())`, deliberately
+
+The canonical `stoaGasMeta()` defaults its clock read to `Math.floor(Date.now() / 1000)`. This
+package has stamped `safeCreationTime()` — the same value minus 30 s — since v3.2.3, to stop a
+client clock running slightly ahead of node time from causing sporadic submit failures (audit
+finding F-BUG-002). Passing that value in explicitly keeps the skew **and** keeps the invariant
+that matters: the price is computed from the exact `creationTime` the command carries, from one
+clock read, so a tick crossing between two reads can never underprice the transaction. Calling
+the bare `stoaGasMeta()` here would silently drop the skew — don't.
+
+### Verification
+
+Two new test files, **43 specs**:
+
+- `v4-6-0-executor-gas-price.test.ts` — behavioural. Drives one real executor per fixed file
+  (17 in total, including the two rotations) through the mocked network seam plus all four pure
+  cross-chain builders, pins the clock 1,157 ticks past genesis, and asserts the command that
+  would reach chainweb carries `gasPrice = 0.000000011157`, above the `1.0e-8` default and equal
+  to the floor recomputed from the `creationTime` the command actually ships.
+- `v4-6-0-gas-price-invariant.test.ts` — structural. Brace-matches **every** `.setMeta({...})`
+  object literal in `src/` (38 of them, including branches the behavioural sample does not drive
+  and any file added later) and requires the `stoaGasMeta(safeCreationTime())` spread, no
+  hand-written `gasPrice`/`creationTime` key, the canonical imports, and no local copy of the
+  formula. This one exists because the failure mode is silent — an omitted `gasPrice` builds and
+  signs fine and only chainweb rejects it.
+
+Both were confirmed non-vacuous: reverting a single site to the old form fails four specs across
+the two files.
+
+Non-breaking. No exported signatures changed. **845 specs pass** (was 800).
+
 ## 4.5.1 — 2026-09-07
 
 **PATCH — the two rotation executors were submitting underpriced transactions.**

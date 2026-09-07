@@ -1,6 +1,6 @@
 {
   "name": "@ouronet/ouronet-core",
-  "version": "4.5.1",
+  "version": "4.6.0",
   "description": "Ouronet-specific business logic for the Ouronet protocol on StoaChain — interactions/* read+execute functions for the ouronet-ns Pact modules, the Codex encrypted-multi-wallet format, Ouronet protocol accounts and tokens. Depends on @stoachain/stoa-core for chain-generic infrastructure (signing, wallet, crypto, network, etc.).",
   "type": "module",
   "main": "./dist/index.js",
@@ -48,8 +48,8 @@
     "clean": "rimraf dist"
   },
   "peerDependencies": {
-    "@stoachain/kadena-stoic-legacy": "4.3.7",
-    "@stoachain/stoa-core": "4.3.7"
+    "@stoachain/kadena-stoic-legacy": "4.4.0",
+    "@stoachain/stoa-core": "4.4.0"
   },
   "repository": {
     "type": "git",

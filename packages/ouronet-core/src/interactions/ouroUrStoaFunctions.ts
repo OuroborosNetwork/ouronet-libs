@@ -3,7 +3,7 @@
  * UrStoa account-existence probe, unwrap-info read, and unwrap execution (parallel to UnwrapStoa).
  */
 
-import { calculateAutoGasLimit } from "@stoachain/stoa-core/gas";
+import { calculateAutoGasLimit, stoaGasMeta } from "@stoachain/stoa-core/gas";
 import {
   KADENA_CHAIN_ID,
   KADENA_NAMESPACE, STOA_AUTONOMIC_OURONETGASSTATION,
@@ -110,7 +110,7 @@ export async function executeUnwrapUrStoa(params: UnwrapUrStoaParams): Promise<a
           });
 
     builder = builder
-      .setMeta({ senderAccount: STOA_AUTONOMIC_OURONETGASSTATION, chainId: KADENA_CHAIN_ID, creationTime: safeCreationTime(),
+      .setMeta({ senderAccount: STOA_AUTONOMIC_OURONETGASSTATION, chainId: KADENA_CHAIN_ID, ...stoaGasMeta(safeCreationTime()),
         gasLimit: effectiveGasLimit })
       .setNetworkId(KADENA_NETWORK)
       .addSigner(gasStationKey.publicKey, (w: any) => [

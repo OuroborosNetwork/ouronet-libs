@@ -3,7 +3,7 @@
  * KDA wrap/unwrap and unwrap-stoa execution + supporting reads.
  */
 
-import { calculateAutoGasLimit } from "@stoachain/stoa-core/gas";
+import { calculateAutoGasLimit, stoaGasMeta } from "@stoachain/stoa-core/gas";
 import {
   KADENA_CHAIN_ID,
   KADENA_NAMESPACE, STOA_AUTONOMIC_OURONETGASSTATION, STOA_AUTONOMIC_LIQUIDPOT,
@@ -46,7 +46,7 @@ export async function wrapKadena(
       })
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride || gasLimit,
       })
@@ -121,7 +121,7 @@ export async function unwrapKadena(
       .execution(`(${KADENA_NAMESPACE}.TS01-C2.LQD|C_UnwrapStoa "${patronAccount.address}" "${unwrapperAccount}" ${decimalAmount})`)
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride || gasLimit,
       })
@@ -266,7 +266,7 @@ export async function executeUnwrapStoa(params: UnwrapStoaParams): Promise<any> 
           });
 
     builder = builder
-      .setMeta({ senderAccount: STOA_AUTONOMIC_OURONETGASSTATION, chainId: KADENA_CHAIN_ID, creationTime: safeCreationTime(),
+      .setMeta({ senderAccount: STOA_AUTONOMIC_OURONETGASSTATION, chainId: KADENA_CHAIN_ID, ...stoaGasMeta(safeCreationTime()),
         gasLimit: effectiveGasLimit })
       .setNetworkId(KADENA_NETWORK)
       // Gas Station: GAS_PAYER + coin.TRANSFER

@@ -7,6 +7,7 @@ import { Pact } from "@stoachain/kadena-stoic-legacy/client";
 import { getFailoverClient } from "@stoachain/stoa-core/network";
 import { pactRead } from "@stoachain/stoa-core/reads";
 import { formatDecimalForPact, safeCreationTime } from "@stoachain/stoa-core/pact";
+import { stoaGasMeta } from "@stoachain/stoa-core/gas";
 import { universalSignTransaction, fromKeypair } from "@stoachain/stoa-core/signing";
 import type { IKadenaKeypair } from "@stoachain/stoa-core/signing";
 export type { IKadenaKeypair } from "@stoachain/stoa-core/signing";
@@ -212,7 +213,7 @@ export async function coilTokensGeneric(
       })
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride || gasLimit,
       })

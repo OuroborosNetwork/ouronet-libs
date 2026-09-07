@@ -12,7 +12,7 @@ import {
 import { Pact } from "@stoachain/kadena-stoic-legacy/client";
 import { getFailoverClient } from "@stoachain/stoa-core/network";
 import { universalSignTransaction, fromKeypair } from "@stoachain/stoa-core/signing";
-import { calculateAutoGasLimit } from "@stoachain/stoa-core/gas";
+import { calculateAutoGasLimit, stoaGasMeta } from "@stoachain/stoa-core/gas";
 import { pactRead } from "@stoachain/stoa-core/reads";
 import { safeCreationTime } from "@stoachain/stoa-core/pact";
 import { getLogger } from "@stoachain/stoa-core/observability";
@@ -96,7 +96,7 @@ export async function executeSingleSwapWithSlippage(
         .addData('slippage-bounds', slippageBoundsObj as any)
         .setMeta({
           senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
           chainId: KADENA_CHAIN_ID,
           gasLimit: gasLimitOverride || gasLimit,
         })
@@ -187,7 +187,7 @@ export async function executeSingleSwapNoSlippage(
         })
         .setMeta({
           senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
           chainId: KADENA_CHAIN_ID,
           gasLimit: gasLimitOverride || gasLimit,
         })
@@ -286,7 +286,7 @@ export async function executeMultiSwapWithSlippage(
         .addData('slippage-bounds', slippageBoundsObj as any)
         .setMeta({
           senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
           chainId: KADENA_CHAIN_ID,
           gasLimit: gasLimitOverride || gasLimit,
         })
@@ -377,7 +377,7 @@ export async function executeMultiSwapNoSlippage(
         })
         .setMeta({
           senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
           chainId: KADENA_CHAIN_ID,
           gasLimit: gasLimitOverride || gasLimit,
         })

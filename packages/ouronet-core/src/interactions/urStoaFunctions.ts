@@ -8,7 +8,7 @@
 
 import { Pact } from "@stoachain/kadena-stoic-legacy/client";
 import { getFailoverClient } from "@stoachain/stoa-core/network";
-import { calculateAutoGasLimit } from "@stoachain/stoa-core/gas";
+import { calculateAutoGasLimit, stoaGasMeta } from "@stoachain/stoa-core/gas";
 import { pactRead } from "@stoachain/stoa-core/reads";
 import {
   KADENA_CHAIN_ID,
@@ -225,7 +225,7 @@ export async function executeNativeUrStoaTransfer(params: ExecuteNativeUrStoaPar
       .execution(pactCode)
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride ?? 2_000_000,
       })
@@ -360,7 +360,7 @@ export async function executeNativeUrStoaTransfer(params: ExecuteNativeUrStoaPar
         .execution(pactCode)
         .setMeta({
           senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
           chainId: KADENA_CHAIN_ID,
           gasLimit: gasLimitOverride ?? 2_000_000,
         })
@@ -458,7 +458,7 @@ export async function executeStakeUrStoa(params: StakeUrStoaParams): Promise<any
       .execution(`(coin.C_URV|Stake "${paymentKeyAddress}" ${validatedAmount})`)
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride ?? 2_000_000,
       })
@@ -514,7 +514,7 @@ export async function executeUnstakeUrStoa(params: UnstakeUrStoaParams): Promise
       .execution(`(coin.C_URV|Unstake "${paymentKeyAddress}" ${validatedAmount})`)
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride ?? 2_000_000,
       })
@@ -599,7 +599,7 @@ export async function executeCollectUrStoa(params: CollectUrStoaParams): Promise
       .execution(code)
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
+        ...stoaGasMeta(safeCreationTime()),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride ?? 2_000_000,
       })
