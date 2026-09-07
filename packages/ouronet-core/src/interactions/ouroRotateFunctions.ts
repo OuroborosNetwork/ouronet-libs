@@ -20,6 +20,51 @@ import { pactRead } from "@stoachain/stoa-core/reads";
 import { getLogger } from "@stoachain/stoa-core/observability";
 
 /**
+ * Yin Engine — StoaChain's time-varying minimum gas price.
+ *
+ * TEMPORARY LOCAL COPY, identical to the one in `crossChainFunctions.ts`
+ * (v4.5.0). Both belong in `@stoachain/stoa-core/gas` long-term — that package
+ * still exposes only the static `GAS_PRICE_MIN_ANU = 10_000`, which is the
+ * genesis floor and has been stale since 2026-02-23. Delete every copy in the
+ * same change that consumes the chain-generic version.
+ *
+ * The floor starts at 10,000 ANU at genesis and rises by 1 ANU every 3 hours,
+ * capped at 400,000 ANU. Source of truth: `UC_MinimumGasPriceANU` in
+ * `pact/stoa-coin/new-coin.pact` (evaluated against `(at "block-time"
+ * (chain-data))` on-chain — creationTime is a close client-side proxy for it).
+ *
+ * This applies to gas-station-paid transactions too: `DALOS.GAS_PAYER` decides
+ * WHO pays, not HOW LITTLE. The chain-wide "gasPrice must be >= the live
+ * floor" rule is checked before the payer guard ever runs, so a transaction
+ * left at the client's `1.0e-8` default is rejected as underpriced no matter
+ * how well-funded the Ouronet Gas Station is.
+ */
+const YIN_GENESIS_TIME_S = 1771869600; // 2026-02-23T18:00:00Z — tick 0
+const YIN_GENESIS_MIN_GAS_ANU = 10_000;
+const YIN_MAX_GAS_ANU = 400_000;
+const YIN_GAS_PRICE_INTERVAL_S = 10_800; // 3 h per tick
+
+function minGasPriceAnu(creationTimeS: number): number {
+  const elapsed = creationTimeS - YIN_GENESIS_TIME_S;
+  const ticks = elapsed <= 0 ? 0 : Math.floor(elapsed / YIN_GAS_PRICE_INTERVAL_S);
+  return Math.min(YIN_GENESIS_MIN_GAS_ANU + ticks, YIN_MAX_GAS_ANU);
+}
+
+/** Built by string padding, never float division — avoids exponential notation / precision loss. */
+function anuToStoaNumber(anu: number): number {
+  return Number("0." + String(anu).padStart(12, "0"));
+}
+
+/**
+ * One clock read: the `creationTime` to stamp and the `gasPrice` derived
+ * FROM THAT EXACT VALUE, so the two can never disagree.
+ */
+function stoaGasMeta(): { creationTime: number; gasPrice: number } {
+  const creationTime = safeCreationTime();
+  return { creationTime, gasPrice: anuToStoaNumber(minGasPriceAnu(creationTime)) };
+}
+
+/**
  * Query RotateKadena info object from the chain.
  * (ouronet-ns.INFO-ZERO.DALOS-INFO|URC_RotateKadena <patron> <account>)
  */
@@ -98,9 +143,15 @@ export async function rotateKadenaPaymentKey(
     builder = builder
       .setMeta({
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
         chainId: KADENA_CHAIN_ID,
         gasLimit: gasLimitOverride || gasLimit,
+        // `stoaGasMeta()` supplies both `creationTime` (via `safeCreationTime()`)
+        // and the `gasPrice` derived from that exact value, per the Yin Engine
+        // (see the module-level comment above). Pre-4.5.1 this set only
+        // `creationTime`, leaving `gasPrice` at the vendored client's
+        // `1.0e-8` default — the genesis floor — so every payment-key rotation
+        // submitted after the floor's first tick was rejected as underpriced.
+        ...stoaGasMeta(),
       })
       .setNetworkId(KADENA_NETWORK)
       // Gas Station key: GAS_PAYER capability (SEPARATE from guard keys)

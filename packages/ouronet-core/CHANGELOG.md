@@ -4,6 +4,53 @@ All notable changes to `@ouronet/ouronet-core`.
 
 This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3.3.8. v4.0.0 split it into a two-package npm workspace under `StoaChain/stoa-js` — chain-generic infrastructure moved out into [`@stoachain/stoa-core`](https://www.npmjs.com/package/@stoachain/stoa-core), this package retained the Ouronet-specific business logic. The `4.0.0` heading below is the first release after the split.
 
+## 4.5.1 — 2026-09-07
+
+**PATCH — the two rotation executors were submitting underpriced transactions.**
+
+### What was broken
+
+`guardFunctions.rotateGuard` and `ouroRotateFunctions.rotateKadenaPaymentKey` set
+`creationTime` in `setMeta` but never set `gasPrice`. The vendored client fills the gap with
+its own default of `1.0e-8` — which is exactly the Yin Engine's **genesis** floor of 10,000
+ANU. The floor has risen 1 ANU every 3 hours since 2026-02-23, so from its first tick onward
+both rotations were built below the chain-wide minimum price and rejected as underpriced.
+
+Paying via the Gas Station does not exempt a transaction from this: `DALOS.GAS_PAYER` decides
+*who* pays, not *how little*. The minimum-price rule is evaluated before the payer guard runs,
+so a well-funded `STOA_AUTONOMIC_OURONETGASSTATION` made no difference.
+
+This is the same live-gas-floor defect 4.5.0 fixed in `crossChainFunctions.ts`; these two files
+were not part of that change. User-visible symptom: Codex's **Rotate Guard** and **Rotate
+Payment Key** modals failing at submit.
+
+### What changed
+
+Both `setMeta` calls now spread the same `stoaGasMeta()` helper 4.5.0 introduced, which returns
+`{ creationTime, gasPrice }` from a **single clock read** — the price is derived from the exact
+`creationTime` that ships in the command, so the two can never disagree. The ANU → STOA
+conversion is string-padding-built (`"0." + String(anu).padStart(12, "0")`), never float
+division, so the value stays exact at 12 decimals.
+
+The helper is a **temporary local duplicate** — the third copy in this repo, after
+`crossChainFunctions.ts` and OuronetUI's `src/lib/gas-price.ts`. All copies carry the same
+constants (genesis 10,000 ANU at `1771869600`, +1 ANU per 3 h, capped at 400,000 ANU) and all
+should be deleted together once `@stoachain/stoa-core/gas` ships the formula; it still exports
+only the static `GAS_PRICE_MIN_ANU = 10_000`.
+
+**Note for auditors:** 17 other `interactions/*` files call `setMeta` without a `gasPrice` and
+are underpriced by the same mechanism. They are out of scope for this patch and unfixed.
+
+### Verification
+
+New `tests/v4-5-1-rotation-gas-price.test.ts` locks the behaviour for both executors (12
+specs): price tracks the live floor, is derived from the shipped `creationTime`, holds at the
+genesis floor at tick 0, caps at 400,000 ANU, stays exact at 12 decimals, and matches between
+the simulated build and the auto-gas-limit rebuild. Confirmed non-vacuous — 8 of the 12 fail
+against the pre-fix source.
+
+Non-breaking. No exported signatures changed. **800 specs pass.**
+
 ## 4.5.0 — 2026-09-07
 
 **MINOR — cross-chain gas payer switched to `stoa-xchain-gas`; live Yin-Engine gas pricing.**
