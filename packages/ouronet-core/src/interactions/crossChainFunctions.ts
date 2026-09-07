@@ -1,10 +1,54 @@
 import { Pact, ITransactionDescriptor } from "@stoachain/kadena-stoic-legacy/client";
 import { getFailoverClient, withFailover } from "@stoachain/stoa-core/network";
 import { KADENA_NETWORK, getPactUrl, STOA_AUTONOMIC_OURONETGASSTATION, KADENA_NAMESPACE } from "../constants/index.js";
-import { GAS_PRICE_MIN_ANU, anuToStoa } from "@stoachain/stoa-core/gas";
 import { pactRead } from "@stoachain/stoa-core/reads";
 import { safeCreationTime, formatDecimalForPact } from "@stoachain/stoa-core/pact";
 import { ChainId } from "@stoachain/kadena-stoic-legacy/types";
+
+/**
+ * Yin Engine — StoaChain's time-varying minimum gas price.
+ *
+ * TEMPORARY LOCAL COPY. This mirrors `OuronetUI/src/lib/gas-price.ts` exactly
+ * (same constants, same formula) because `@stoachain/stoa-core/gas` has not
+ * yet been upgraded past the static `GAS_PRICE_MIN_ANU = 10_000`. It belongs
+ * there long-term (chain-generic, not Ouronet-specific) — consolidate this
+ * away once stoa-core ships it.
+ *
+ * The floor starts at 10,000 ANU at genesis and rises by 1 ANU every 3 hours,
+ * capped at 400,000 ANU. Source of truth: `UC_MinimumGasPriceANU` in
+ * `pact/stoa-coin/new-coin.pact` (evaluated against `(at "block-time"
+ * (chain-data))` on-chain — creationTime is a close client-side proxy for it).
+ *
+ * `stoa-xchain-gas`'s own guard (`pact/genesis/stoa/stoa-genesis-5.pact`)
+ * requires `gasPrice <= UC_MinimumGasPriceANU()` (an upper bound, not a
+ * floor) — combined with the chain-wide "must be >= the floor" rule, the
+ * only value that satisfies both is the floor itself. Never overpay this
+ * account; it pays minimum-priced redemptions only.
+ */
+const YIN_GENESIS_TIME_S = 1771869600; // 2026-02-23T18:00:00Z — tick 0
+const YIN_GENESIS_MIN_GAS_ANU = 10_000;
+const YIN_MAX_GAS_ANU = 400_000;
+const YIN_GAS_PRICE_INTERVAL_S = 10_800; // 3 h per tick
+
+function minGasPriceAnu(creationTimeS: number): number {
+  const elapsed = creationTimeS - YIN_GENESIS_TIME_S;
+  const ticks = elapsed <= 0 ? 0 : Math.floor(elapsed / YIN_GAS_PRICE_INTERVAL_S);
+  return Math.min(YIN_GENESIS_MIN_GAS_ANU + ticks, YIN_MAX_GAS_ANU);
+}
+
+/** Built by string padding, never float division — avoids exponential notation / precision loss. */
+function anuToStoaNumber(anu: number): number {
+  return Number("0." + String(anu).padStart(12, "0"));
+}
+
+/**
+ * One clock read: the `creationTime` to stamp and the `gasPrice` derived
+ * FROM THAT EXACT VALUE, so the two can never disagree.
+ */
+function stoaGasMeta(): { creationTime: number; gasPrice: number } {
+  const creationTime = safeCreationTime();
+  return { creationTime, gasPrice: anuToStoaNumber(minGasPriceAnu(creationTime)) };
+}
 
 /**
  * Get KDA balance for an account on a specific chain.
@@ -113,20 +157,17 @@ export function buildCrossChainTransfer(params: CrossChainTransferParams) {
     .setMeta({
       chainId: sourceChain as ChainId,
       senderAccount: sender,
-      // v3.2.3: added `creationTime: safeCreationTime()` to close audit
-      // finding F-BUG-002. The v2.3.0 audit consolidated `safeCreationTime()`
-      // (returns `Date.now()/1000 - 30`) precisely so client-side clock drift
-      // doesn't trigger chain-side "creation time too far in the future"
-      // rejections; without this field, `@kadena/client` falls back to the
-      // raw current time and any consumer with a clock slightly ahead of
-      // node time gets sporadic submit failures. This was the lone builder
-      // in interactions/* that omitted the helper after the v2.3.0 sweep —
-      // every other setMeta block (including `buildCTransferAcross` two
-      // functions below) already includes it.
-      creationTime: safeCreationTime(),
+      // v3.2.3: `creationTime` closes audit finding F-BUG-002 — without it
+      // `@kadena/client` falls back to raw current time and a client clock
+      // slightly ahead of node time gets sporadic submit failures.
+      // `stoaGasMeta()` supplies both `creationTime` (via `safeCreationTime()`)
+      // and the `gasPrice` derived from that exact value, per the Yin Engine
+      // (see the module-level comment above) — the chain-wide minimum price
+      // rises over time, so a hardcoded `gasPrice` would eventually be
+      // rejected as underpriced.
       gasLimit: 2500,
-      gasPrice: 0.00000001,
       ttl: 28800,
+      ...stoaGasMeta(),
     })
     .setNetworkId(KADENA_NETWORK)
     .createTransaction();
@@ -152,7 +193,7 @@ export interface CTransferAcrossParams {
  * Build a coin.C_TransferAcross transaction (step 0 of cross-chain transfer).
  *
  * Chain 0: Gas paid by Ouronet Gas Station (DALOS.GAS_PAYER).
- * Other chains: Gas paid by kadena-xchain-gas (unsigned).
+ * Other chains: Gas paid by stoa-xchain-gas (unsigned).
  */
 export function buildCTransferAcross(params: CTransferAcrossParams) {
   const {
@@ -186,17 +227,18 @@ export function buildCTransferAcross(params: CTransferAcrossParams) {
       .setMeta({
         chainId: "0" as ChainId,
         senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
-        creationTime: safeCreationTime(),
         gasLimit: 2500,
-        gasPrice: anuToStoa(GAS_PRICE_MIN_ANU),
         ttl: 28800,
+        ...stoaGasMeta(),
       })
       .setNetworkId(KADENA_NETWORK)
       .createTransaction();
   } else {
-    // Non-chain-0: kadena-xchain-gas pays gas.
+    // Non-chain-0: stoa-xchain-gas pays gas (StoaChain's own xchain gas
+    // station — replaces the legacy `kadena-xchain-gas` account).
     // Its guard uses coin.gas-only (no signature needed) BUT requires:
-    //   - gasPrice <= 0.00000001
+    //   - gasPrice <= UC_MinimumGasPriceANU() (the live Yin floor — an upper
+    //     bound, not a static ceiling; see the module-level comment above)
     //   - gasLimit <= 850
     // No signer needed for gas — only sender signs TRANSFER_XCHAIN cap.
     return Pact.builder
@@ -207,10 +249,10 @@ export function buildCTransferAcross(params: CTransferAcrossParams) {
       ])
       .setMeta({
         chainId: sourceChain as ChainId,
-        senderAccount: "kadena-xchain-gas",
-        gasLimit: 850,       // must be ≤ 850 for kadena-xchain-gas guard
-        gasPrice: 0.00000001, // must be ≤ 0.00000001 for kadena-xchain-gas guard
+        senderAccount: "stoa-xchain-gas",
+        gasLimit: 850, // must be <= 850 for the stoa-xchain-gas guard
         ttl: 28800,
+        ...stoaGasMeta(),
       })
       .setNetworkId(KADENA_NETWORK)
       .createTransaction();
@@ -430,7 +472,7 @@ export function buildContinuationTransaction(
   pactId: string,
   proof: string,
   targetChain: string,
-  gasPayerAccount = "kadena-xchain-gas"
+  gasPayerAccount = "stoa-xchain-gas"
 ) {
   const transaction = Pact.builder
     .continuation({
@@ -442,9 +484,9 @@ export function buildContinuationTransaction(
     .setMeta({
       chainId: targetChain as ChainId,
       senderAccount: gasPayerAccount,
-      gasLimit: 850,
-      gasPrice: 0.00000001,
+      gasLimit: 850, // must be <= 850 for the stoa-xchain-gas guard
       ttl: 28800,
+      ...stoaGasMeta(),
     })
     .setNetworkId(KADENA_NETWORK)
     .createTransaction();

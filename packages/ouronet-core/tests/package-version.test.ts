@@ -3,7 +3,7 @@ import pkg from "../package.json" with { type: "json" };
 
 describe("@ouronet/ouronet-core package.json version", () => {
   it("declares the released semver string", () => {
-    expect(pkg.version).toBe("4.4.0");
+    expect(pkg.version).toBe("4.5.0");
   });
 
   it("is a valid semver MAJOR.MINOR.PATCH triplet", () => {

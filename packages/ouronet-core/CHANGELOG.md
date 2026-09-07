@@ -4,6 +4,43 @@ All notable changes to `@ouronet/ouronet-core`.
 
 This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3.3.8. v4.0.0 split it into a two-package npm workspace under `StoaChain/stoa-js` — chain-generic infrastructure moved out into [`@stoachain/stoa-core`](https://www.npmjs.com/package/@stoachain/stoa-core), this package retained the Ouronet-specific business logic. The `4.0.0` heading below is the first release after the split.
 
+## 4.5.0 — 2026-09-07
+
+**MINOR — cross-chain gas payer switched to `stoa-xchain-gas`; live Yin-Engine gas pricing.**
+
+### What changed
+
+`crossChainFunctions.ts`'s non-chain-0 gas payer moves off the legacy `kadena-xchain-gas`
+account (a static `gasPrice <= 0.00000001` / `gasLimit <= 850` guard) onto StoaChain's own
+`stoa-xchain-gas` account. Its guard (`pact/genesis/stoa/stoa-genesis-5.pact`) requires
+`gasPrice <= UC_MinimumGasPriceANU()` — a **live floor**, not a fixed ceiling — so a hardcoded
+price would eventually either be rejected by this guard's ceiling (once the floor rises above
+whatever was hardcoded, that part is safe) or, more importantly, fall **below** the chain-wide
+minimum price the Yin Engine enforces post-fork.
+
+All four `gasPrice` call sites in this file now derive `{ creationTime, gasPrice }` from a
+single local Yin-Engine helper instead of a hardcoded number or the static `GAS_PRICE_MIN_ANU`:
+
+- `buildCrossChainTransfer` (legacy single-step `coin.transfer-crosschain`, self-paid gas)
+- `buildCTransferAcross` — chain-0 branch (`DALOS.GAS_PAYER`, previously on the static
+  `anuToStoa(GAS_PRICE_MIN_ANU)`)
+- `buildCTransferAcross` — non-chain-0 branch (now `stoa-xchain-gas`, was `kadena-xchain-gas`)
+- `buildContinuationTransaction` — default `gasPayerAccount` (now `stoa-xchain-gas`)
+
+The Yin-Engine helper is a **temporary local duplicate** of OuronetUI's `src/lib/gas-price.ts`
+(same constants, same formula — genesis 10,000 ANU, +1 ANU/3h, capped at 400,000 ANU). It
+belongs in `@stoachain/stoa-core/gas` once that package ships the same formula; that package
+currently still only exports the static `GAS_PRICE_MIN_ANU = 10_000`. Consolidate then.
+
+### Verification
+
+Confirmed against a live StoaChain node (not just simulated): both the initial
+`C_TransferAcross` (chain-0, `DALOS.GAS_PAYER`) and the `stoa-xchain-gas`-paid continuation
+landed successfully at **11,565 ANU/gas**, the live floor at time of testing.
+
+Non-breaking. No exported function signatures changed — only the default `gasPayerAccount`
+value and the internal price derivation. **787 specs pass.**
+
 ## 4.4.0 — 2026-07-22
 
 **MINOR — the codex writer is held at `"1.2"` while the reader keeps accepting `"1.2"` and `"1.3"`.**
