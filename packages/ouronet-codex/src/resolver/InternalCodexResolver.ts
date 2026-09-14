@@ -30,6 +30,24 @@
  * Cryptography is delegated entirely to @stoachain/stoa-core/{crypto,wallet}
  * + @stoachain/kadena-stoic-legacy/hd-wallet. This file owns ONLY the
  * codex-state-to-keypair plumbing — no key derivation logic of its own.
+ *
+ * Signing-dispatch investigation (Stoic path, added alongside `"stoic"` in
+ * SeedType): `@stoachain/stoa-core/signing`'s `universalSignTransaction`
+ * does NOT branch on seedType generically — it has exactly one explicit
+ * string check, `kp.seedType === "chainweaver" || kp.seedType ===
+ * "eckowallet"` (AND `encryptedSecretKey` + `password` both truthy), which
+ * selects its WASM-signing branch; every other keypair (koala, foreign,
+ * and now stoic) falls through to the nacl branch using `kp.secretKey`
+ * directly. That file lives in stoa-core and is out of scope to edit, and
+ * needs no change for stoic — a stoic keypair naturally falls through to
+ * nacl as long as THIS file returns `seedType: "stoic"` (not "chainweaver"/
+ * "eckowallet") with a plain hex `privateKey`. The dispatch that DOES need
+ * a new branch is local to this file: `getKeyPairByPublicKey`'s
+ * "Derived-account lookup" loop below previously assumed every kadena
+ * seed's `secret` decrypts to a mnemonic (feeding it straight into
+ * `KadenaWalletBuilder.createWalletPairFromMnemonic`) — false for stoic
+ * seeds, whose `secret` is a DALOS bitstring. See the `seed.seedType ===
+ * "stoic"` branch inline below.
  */
 
 import type { UseBoundStore, StoreApi } from "zustand";
@@ -44,6 +62,10 @@ import { hexToBin } from "@stoachain/kadena-stoic-legacy/cryptography-utils";
 
 import type { CodexStoreState } from "../state/store.js";
 import { CodexKeyMissingError, CodexLockedError } from "../errors/types.js";
+import {
+  createWalletPairFromDalosBitString,
+  type StoicKadenaKeypair,
+} from "../wallet/stoicDalosBridge.js";
 
 type CodexStore = UseBoundStore<StoreApi<CodexStoreState>>;
 
@@ -164,6 +186,39 @@ export class InternalCodexResolver implements KeyResolver {
     for (const seed of state.kadenaSeeds) {
       const account = seed.accounts.find((a) => a.publicKey === publicKey);
       if (!account) continue;
+
+      // Stoic seeds have NO mnemonic — `seed.secret` decrypts to the
+      // 1600-bit DALOS bitstring re-derived at CreateKadenaSeedModal-time
+      // (see IKadenaSeed.secret's doc), not a BIP39/Chainweaver mnemonic.
+      // `createWalletPairFromMnemonic` below has no "stoic" case (and
+      // never will — it's a stoa-core file we don't own), so this branch
+      // MUST come first: falling through to the generic mnemonic path
+      // would feed a bitstring to it as if it were words, throwing or
+      // (worse) silently deriving the wrong key. `secretKey` returned here
+      // is already a PLAIN nacl-signable hex private key (not the
+      // `@kadena/hd-wallet`-encrypted blob the mnemonic path returns), so
+      // no `kadenaDecrypt`/truncation dance is needed — same shape as
+      // koala's post-decrypt key. `seedType: "stoic"` (via the widened
+      // `StoicKadenaKeypair`, see stoicDalosBridge.ts) keeps this OUT of
+      // universalSignTransaction's chainweaver/eckowallet WASM branch
+      // (that branch requires an exact seedType match + encryptedSecretKey
+      // + password, none of which are set here) — it falls through to the
+      // same nacl path koala/foreign keys use, with zero changes needed in
+      // stoa-core's universalSignTransaction itself.
+      if (seed.seedType === "stoic") {
+        const bitString = await smartDecrypt(seed.secret, password);
+        const { publicKey: pub, secretKey } = createWalletPairFromDalosBitString(
+          bitString,
+          account.index
+        );
+        const stoicKeypair: StoicKadenaKeypair = {
+          publicKey: pub,
+          privateKey: secretKey,
+          seedType: "stoic",
+        };
+        // TEMPORARY cast — see stoicDalosBridge.ts's StoicKadenaKeypair doc.
+        return stoicKeypair as IKadenaKeypair;
+      }
 
       // Decrypt the seed's mnemonic, then re-derive the keypair at the
       // recorded index. Same dance as OuronetUI's wallet-context.getKadenaKeyPairs

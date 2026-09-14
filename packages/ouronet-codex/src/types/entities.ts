@@ -17,9 +17,22 @@
  */
 
 /** Wallet-software origin of a kadena HD seed. Determines which signing path
- *  the universal-sign pipeline routes to (koala/foreign → nacl,
- *  chainweaver/eckowallet → WASM). */
-export type SeedType = "koala" | "chainweaver" | "eckowallet";
+ *  the universal-sign pipeline routes to (koala/foreign/stoic → nacl,
+ *  chainweaver/eckowallet → WASM).
+ *
+ *  `"stoic"` (added for the Stoic path) is structurally UNLIKE the other
+ *  three: it has no mnemonic at all. It's derived by reusing an existing
+ *  `dalos`-curve Ouronet account's own seed material (seed words or a raw
+ *  DALOS bitstring) through `KadenaWalletBuilder.createWalletPairFromDalosBitString`
+ *  — see `src/ui/internal/CreateKadenaSeedModal.tsx` and
+ *  `src/wallet/stoicDalosBridge.ts` for the full derivation + the note on
+ *  why that method needs a temporary type bridge (not yet published by
+ *  `@stoachain/stoa-core` as of this writing). A stoic key is a plain
+ *  32-byte Ed25519 seed (nacl-signable hex), same shape as koala's — see
+ *  `InternalCodexResolver.getKeyPairByPublicKey`'s explicit `"stoic"`
+ *  branch, which decrypts the seed's stored bitstring instead of a
+ *  mnemonic. */
+export type SeedType = "koala" | "chainweaver" | "eckowallet" | "stoic";
 
 /** DALOS-family cryptographic curve that produced an ouro account's keys.
  *  Stamped at spawn time; legacy accounts without this field fall back to
@@ -56,7 +69,16 @@ export interface WalletAccount {
 }
 
 /** A kadena HD seed (one mnemonic) with all derived accounts. The `secret`
- *  is the encrypted mnemonic (encrypted at the codex password). */
+ *  is the encrypted mnemonic (encrypted at the codex password) — EXCEPT
+ *  for `seedType: "stoic"`, which has no mnemonic: its `secret` is instead
+ *  the encrypted 1600-bit DALOS bitstring re-derived from an existing
+ *  `dalos`-curve `IOuroAccount`'s own seed material at creation time
+ *  (`encryptStringV2`, same envelope as every other seed type). This keeps
+ *  `IKadenaSeed` fully self-contained — no cross-entity reference back to
+ *  the source `IOuroAccount` is stored — consistent with how every other
+ *  seed type already works, at the cost of `secret`'s doc comment no
+ *  longer being literally "the mnemonic" for one variant. See
+ *  `CreateKadenaSeedModal.tsx`'s Stoic branch. */
 export interface IKadenaSeed {
   id: string;
   name?: string;

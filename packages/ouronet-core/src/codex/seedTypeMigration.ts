@@ -41,11 +41,35 @@ const SEED_TYPE_MIGRATION: Record<string, SeedType> = {
  * pre-v4.1.1 silent `|| "koala"` fallback that could route unknown seed types
  * through koala derivation, masking codex-import drift.
  *
+ * TEMPORARY "stoic" passthrough — investigated + added while wiring
+ * `ouronet-codex`'s new Stoic seed path (see that package's
+ * `types/entities.ts` SeedType and `CreateKadenaSeedModal.tsx`). Without
+ * this, `LocalStorageCodexAdapter.loadKadenaSeedsWithMigration` — which
+ * runs `migrateSeedType` on EVERY stored kadena seed on EVERY load, not
+ * just legacy ones — would throw `UnknownSeedTypeError` on a stoic seed
+ * and its `catch` clause would silently rewrite `seedType` to `"koala"`,
+ * corrupting a real user's stoic account on next reload. "stoic" is
+ * intentionally NOT added as a row to `SEED_TYPE_MIGRATION` (below) or to
+ * the `SeedType` type itself, because both are locked by
+ * `v4-1-1-seed-type-dedup.test.ts` / `v4-1-1-type-preservation.test.ts`
+ * (REQ-12/REQ-13), which require `SeedType` to stay a byte-identical
+ * re-export of `@stoachain/stoa-core/wallet`'s own (currently 3-literal)
+ * union — that union doesn't have "stoic" yet either (not published; see
+ * `ouronet-codex/src/wallet/stoicDalosBridge.ts` for the sibling gap).
+ * The `as SeedType` cast below is a narrow, documented lie to the type
+ * system for this one literal only. Remove this special-case (folding
+ * "stoic" into SEED_TYPE_MIGRATION as a normal self-mapping row instead)
+ * once stoa-core publishes a SeedType that includes "stoic" and the two
+ * locked tests above are updated to match.
+ *
  * @param rawType - The seed-type string from the v1.x codex envelope
- * @returns Canonical SeedType ("koala" | "chainweaver" | "eckowallet")
+ * @returns Canonical SeedType ("koala" | "chainweaver" | "eckowallet"), or
+ *   the "stoic" passthrough described above
  * @throws UnknownSeedTypeError when rawType is not in SEED_TYPE_MIGRATION
+ *   and isn't the "stoic" passthrough
  */
 export function migrateSeedType(rawType: string): SeedType {
+  if (rawType === "stoic") return rawType as SeedType;
   const result = SEED_TYPE_MIGRATION[rawType];
   if (result === undefined) {
     throw new UnknownSeedTypeError(

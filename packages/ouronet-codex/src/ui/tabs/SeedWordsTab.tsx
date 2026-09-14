@@ -23,6 +23,7 @@ import {
 import { smartDecrypt } from "@stoachain/stoa-core/crypto";
 import { KadenaWalletBuilder } from "@stoachain/stoa-core/wallet";
 import { binToHex } from "@stoachain/kadena-stoic-legacy/cryptography-utils";
+import { createWalletPairFromDalosBitString } from "../../wallet/stoicDalosBridge.js";
 import { useKadenaSeeds } from "../../hooks/useKadenaSeeds.js";
 import { useCodexAuth } from "../../hooks/useCodexAuth.js";
 import { useEnsureCodexUnlocked } from "../../zbom/hooks/useEnsureCodexUnlocked.js";
@@ -33,13 +34,20 @@ import type { IKadenaSeed, SeedType, WalletAccount } from "../../types/entities.
 
 const MONO = "var(--codex-font-mono, 'JetBrains Mono', ui-monospace, monospace)";
 
+// Chainweaver and EckoWallet are the same wallet at the crypto level (see
+// CreateKadenaSeedModal.tsx), so both keys render the same unified badge —
+// this is a display-only lookup, not a selector; both values must stay valid
+// so a legacy seed persisted as "eckowallet" still renders correctly.
 const SEED_COLORS: Record<SeedType, { label: string; color: string; bg: string }> = {
   koala: { label: "Koala", color: "#ec4899", bg: "#4a1035" },
-  chainweaver: { label: "Chainweaver", color: "#3b82f6", bg: "#1e3a5f" },
-  eckowallet: { label: "EckoWallet", color: "#f97316", bg: "#431407" },
+  chainweaver: { label: "Chainweaver / EckoWallet", color: "#3b82f6", bg: "#1e3a5f" },
+  eckowallet: { label: "Chainweaver / EckoWallet", color: "#3b82f6", bg: "#1e3a5f" },
+  // Stoic reuses the user's existing Ouronet (DALOS) seed — its own color,
+  // distinct from koala/chainweaver, so the badge reads as its own family.
+  stoic: { label: "Stoic", color: "#22c55e", bg: "#0f3a24" },
 };
 const normalizeSeedType = (raw: string | undefined): SeedType =>
-  raw === "koala" || raw === "chainweaver" || raw === "eckowallet" ? raw : "chainweaver";
+  raw === "koala" || raw === "chainweaver" || raw === "eckowallet" || raw === "stoic" ? raw : "chainweaver";
 
 const derivationPath = (i: number) => `m'/44'/626'/${i}'`;
 
@@ -266,11 +274,21 @@ function SeedRow({
    *       wrong, e.g. `<scrambled>‖<pubkey>‖<chainCode>`.)
    *    - Koala is plain Ed25519; its 32-byte (64-hex) key is already correct and
    *      equally password-agnostic, so it is left on the codex password path
-   *      unchanged. */
+   *      unchanged.
+   *    - Stoic has no mnemonic at all — `seed.secret` decrypts to the
+   *      1600-bit DALOS bitstring, not a mnemonic, so it CANNOT go through
+   *      `createWalletPairFromMnemonic` (same reasoning as
+   *      InternalCodexResolver's `"stoic"` branch). Its `secretKey` is
+   *      already a PLAIN nacl-signable hex key — no
+   *      `KadenaWalletBuilder.decrypt` unwrap needed. */
   const revealPrivateKey = (account: WalletAccount) => async (): Promise<string> => {
     if (!(await ensureUnlocked())) throw new Error("locked");
     const password = getCurrentPassword();
-    const mnemonic = await smartDecrypt(seed.secret, password);
+    const secretPlain = await smartDecrypt(seed.secret, password);
+    if (seed.seedType === "stoic") {
+      return createWalletPairFromDalosBitString(secretPlain, account.index).secretKey;
+    }
+    const mnemonic = secretPlain;
     const isExtended = seed.seedType === "chainweaver" || seed.seedType === "eckowallet";
     // Empty wallet password for extended keys → plaintext scalar. Koala keeps
     // the codex password (no behavioral change; its key is password-agnostic).
@@ -480,7 +498,12 @@ export function SeedWordsTab({ className }: SeedWordsTabProps) {
 
   /** Derive a key at `index` from the seed's mnemonic and persist it. `onStage`
    *  is awaited before each step so the progress label (and the compositor sweep
-   *  bar) paint before the CPU-heavy derivation blocks the main thread. */
+   *  bar) paint before the CPU-heavy derivation blocks the main thread.
+   *
+   *  Stoic seeds have no mnemonic — `seed.secret` decrypts to the 1600-bit
+   *  DALOS bitstring instead, derived via `createWalletPairFromDalosBitString`
+   *  (same reasoning as `revealPrivateKey` above / InternalCodexResolver's
+   *  `"stoic"` branch). */
   const handleAddKey = async (
     seed: IKadenaSeed,
     index: number,
@@ -490,11 +513,14 @@ export function SeedWordsTab({ className }: SeedWordsTabProps) {
     if (!(await ensureUnlocked())) throw new Error("Unlock the codex to add keys.");
     const password = getCurrentPassword();
     await onStage?.("Decrypting seed…");
-    const mnemonic = await smartDecrypt(seed.secret, password);
+    const secretPlain = await smartDecrypt(seed.secret, password);
     await onStage?.("Deriving keypair…");
-    const kp = await KadenaWalletBuilder.createWalletPairFromMnemonic(password, mnemonic, index, seed.seedType);
+    const publicKey =
+      seed.seedType === "stoic"
+        ? createWalletPairFromDalosBitString(secretPlain, index).publicKey
+        : (await KadenaWalletBuilder.createWalletPairFromMnemonic(password, secretPlain, index, seed.seedType)).publicKey;
     await onStage?.("Saving key…");
-    const newAcc: WalletAccount = { index, publicKey: kp.publicKey, derivationPath: derivationPath(index) };
+    const newAcc: WalletAccount = { index, publicKey, derivationPath: derivationPath(index) };
     const accounts = [...seed.accounts.filter((a) => a.index !== index), newAcc].sort((a, b) => a.index - b.index);
     await updateSeed({ ...seed, accounts });
   };

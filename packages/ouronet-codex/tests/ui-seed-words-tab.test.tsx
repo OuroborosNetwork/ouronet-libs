@@ -12,12 +12,22 @@ import * as React from "react";
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { smartEncrypt } from "@stoachain/stoa-core/crypto";
+import { KadenaWalletBuilder } from "@stoachain/stoa-core/wallet";
 
 import { CodexProvider } from "@ouronet/ouronet-codex/provider";
 import { MemoryCodexAdapter } from "@ouronet/ouronet-codex/adapters";
 import { useCodex, useKadenaSeeds, useCodexAuth } from "@ouronet/ouronet-codex/hooks";
 import { SeedWordsTab } from "@ouronet/ouronet-codex/ui";
 import type { IKadenaSeed } from "@ouronet/ouronet-codex/types";
+
+/** Mirrors the codex seeds slice into a caller-supplied setter, so a test can
+ *  assert on the final persisted seed shape (e.g. seedType) after a flow that
+ *  only exposes its result through the store, not the modal's own UI. */
+function SeedSpy({ onSeeds }: { onSeeds: (seeds: IKadenaSeed[]) => void }) {
+  const { seeds } = useKadenaSeeds();
+  React.useEffect(() => { onSeeds(seeds); }, [seeds, onSeeds]);
+  return null;
+}
 
 const seedFx = (over: Partial<IKadenaSeed> = {}): IKadenaSeed => ({
   id: over.id ?? "s1",
@@ -52,12 +62,13 @@ function Authenticator({ password }: { password: string }) {
   return null;
 }
 
-async function renderTab(seeds: IKadenaSeed[] = [], password?: string) {
+async function renderTab(seeds: IKadenaSeed[] = [], password?: string, onSeeds?: (seeds: IKadenaSeed[]) => void) {
   const adapter = new MemoryCodexAdapter("dev");
   const utils = render(
     <CodexProvider adapter={adapter}>
       <Seeder seeds={seeds} />
       {password !== undefined && <Authenticator password={password} />}
+      {onSeeds && <SeedSpy onSeeds={onSeeds} />}
       <SeedWordsTab />
     </CodexProvider>,
   );
@@ -210,5 +221,97 @@ describe("<SeedWordsTab>", () => {
     // a rendering bug rather than the timeout it actually is. This is what
     // failed the v4.4.0 publish.
     expect(await screen.findByText(phrase, {}, { timeout: 15_000 })).toBeTruthy();
+    // Note (test-runner correctness, not just the findByText call): the `it`
+    // itself needs a timeout >= the internal findByText wait below, or
+    // vitest's default 5000ms test-level timeout can fire first regardless
+    // of the 15s allowance given to findByText — surfaced by this file
+    // growing more real-crypto tests (the Chainweaver/EckoWallet suite
+    // below) that raise per-worker CPU contention under `npm test`.
+  }, 20_000);
+
+  describe("Chainweaver/EckoWallet unification (Part 1 — presentation-layer only)", () => {
+    it("offers only ONE Chainweaver/EckoWallet-family seed-type option, not two", async () => {
+      await renderTab([]);
+      fireEvent.click(screen.getByRole("button", { name: /create your first seed/i }));
+      await screen.findByRole("dialog");
+
+      // Exactly one selectable seed-type button mentions the Chainweaver/EckoWallet
+      // family — previously there were two ("Chainweaver" and "EckoWallet").
+      const familyButtons = screen
+        .getAllByRole("button")
+        .filter((b) => /chainweaver/i.test(b.textContent || "") || /eckowallet/i.test(b.textContent || ""));
+      expect(familyButtons.length).toBe(1);
+      expect(familyButtons[0].textContent).toMatch(/chainweaver/i);
+      expect(familyButtons[0].textContent).toMatch(/eckowallet/i);
+
+      // The explanatory copy states they are the same wallet, not two different ones.
+      fireEvent.click(familyButtons[0]);
+      expect(
+        await screen.findByText(/chainweaver and eckowallet are the same wallet/i),
+      ).toBeTruthy();
+    });
+
+    it("creating a new seed via the unified option always persists seedType: 'chainweaver' (never 'eckowallet')", async () => {
+      let captured: IKadenaSeed[] = [];
+      await renderTab([], undefined, (seeds) => { captured = seeds; });
+
+      fireEvent.click(screen.getByRole("button", { name: /create your first seed/i }));
+      await screen.findByRole("dialog");
+
+      const familyButton = screen
+        .getAllByRole("button")
+        .find((b) => /eckowallet/i.test(b.textContent || ""))!;
+      fireEvent.click(familyButton);
+
+      // Wait for the 12-word mnemonic to generate and the live Key #0 preview
+      // to resolve (gates the Add Seed button) — real crypto, generous timeout.
+      await waitFor(
+        () => expect(screen.getByText(/key #0 preview/i)).toBeTruthy(),
+        { timeout: 15_000 },
+      );
+
+      fireEvent.change(screen.getByPlaceholderText(/my seed/i), { target: { value: "New Chainweaver Seed" } });
+      fireEvent.change(screen.getByPlaceholderText(/enter your password/i), { target: { value: "hunter2" } });
+
+      const addButton = screen.getByRole("button", { name: /^add seed$/i }) as HTMLButtonElement;
+      await waitFor(() => expect(addButton.disabled).toBe(false), { timeout: 15_000 });
+      fireEvent.click(addButton);
+
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull(), { timeout: 15_000 });
+
+      const created = captured.find((s) => s.name === "New Chainweaver Seed");
+      expect(created).toBeTruthy();
+      expect(created!.seedType).toBe("chainweaver");
+    }, 20_000);
+
+    it("still displays, decrypts, and derives keys correctly for a legacy seed tagged seedType: 'eckowallet'", async () => {
+      const password = "hunter2";
+      const mnemonic = await KadenaWalletBuilder.generateMnemonic(12);
+      const encrypted = await smartEncrypt(mnemonic, password, "2");
+
+      await renderTab(
+        [
+          seedFx({ id: "p", name: "Prime" }),
+          seedFx({ id: "ecko", name: "Legacy Ecko Seed", seedType: "eckowallet", secret: encrypted, accounts: [] }),
+        ],
+        password,
+      );
+
+      const card = (await screen.findByText("Legacy Ecko Seed")).closest("[data-seed-id]") as HTMLElement;
+
+      // Renders without throwing, using the unified badge label.
+      expect(within(card).getByText(/chainweaver.*eckowallet/i)).toBeTruthy();
+
+      // Decryption still works for data stored under the legacy "eckowallet" tag.
+      openMenu(card);
+      fireEvent.click(within(card).getByRole("button", { name: /view seed words/i }));
+      expect(await screen.findByText(mnemonic, {}, { timeout: 15_000 })).toBeTruthy();
+
+      // Derivation still works: adding a key exercises
+      // KadenaWalletBuilder.createWalletPairFromMnemonic(..., "eckowallet").
+      fireEvent.click(within(card).getByText("Legacy Ecko Seed"));
+      fireEvent.click(within(card).getByRole("button", { name: /add consecutive key/i }));
+      expect(await within(card).findByText("Key #0", {}, { timeout: 15_000 })).toBeTruthy();
+    }, 30_000);
   });
 });

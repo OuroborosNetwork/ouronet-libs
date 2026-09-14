@@ -32,7 +32,11 @@ import type { IKadenaSeed } from "../../types/entities.js";
 const MONO = "var(--codex-font-mono, 'JetBrains Mono', ui-monospace, monospace)";
 const ADDR_PREFIXES = ["k:", "u:", "c:", "w:"];
 const ADDR_COLORS: Record<string, string> = { "k:": "#c0c0c0", "u:": "#92400e", "c:": "#3b82f6", "w:": "#a78bfa" };
-const SEED_TYPE_COLOR: Record<string, string> = { chainweaver: "#3b82f6", eckowallet: "#f97316", koala: "#ec4899" };
+// Chainweaver and EckoWallet are the same wallet underneath (see
+// CreateKadenaSeedModal.tsx) — both keys stay valid for legacy display, now
+// sharing one color so a group derived from an "eckowallet"-tagged seed
+// doesn't visually read as a different wallet family than "chainweaver".
+const SEED_TYPE_COLOR: Record<string, string> = { chainweaver: "#3b82f6", eckowallet: "#3b82f6", koala: "#ec4899", stoic: "#22c55e" };
 
 const truncAddr = (a: string) => (a.length > 24 ? `${a.slice(0, 12)}…${a.slice(-10)}` : a);
 const fmt12 = (n: number) => n.toFixed(12);
