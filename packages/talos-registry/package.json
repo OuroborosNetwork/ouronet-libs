@@ -1,0 +1,45 @@
+{
+  "name": "@ouronet/talos-registry",
+  "version": "1.0.0",
+  "description": "The Ouronet callable surface, generated from the deployed contracts. Supply values; never type a function name.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "sync": "node scripts/sync-registry.mjs",
+    "build": "npm run sync && tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rimraf dist",
+    "sync:check": "node scripts/sync-registry.mjs --check"
+  },
+  "keywords": [
+    "ouronet",
+    "pact",
+    "kadena",
+    "stoachain",
+    "registry"
+  ],
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0",
+    "rimraf": "^6.0.0"
+  }
+}
