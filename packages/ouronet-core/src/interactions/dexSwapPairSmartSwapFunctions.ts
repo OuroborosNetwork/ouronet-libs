@@ -15,6 +15,7 @@ import { universalSignTransaction, fromKeypair } from "@stoachain/stoa-core/sign
 import { calculateAutoGasLimit, stoaGasMeta } from "@stoachain/stoa-core/gas";
 import { pactRead } from "@stoachain/stoa-core/reads";
 import { safeCreationTime } from "@stoachain/stoa-core/pact";
+import { buildSmartSwapBundle } from "./smartSwapBundle.js";
 import type {
   SmartSwapHopper,
   SmartSwapSlippageBounds,
@@ -125,7 +126,32 @@ export async function executeSmartSwapWithSlippage(
       slippage
     );
 
-    const pactCode = `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_SmartSwapWithSlippage "${params.patronKeypair.address}" "${params.account}" "${params.inputId}" ${amountDecimal} "${params.outputId}" (read-msg 'slippage-bounds))`;
+    // THE ROUTE BUNDLE -- the seventh argument, and the reason this entrypoint exists.
+    //
+    // `C_SmartSwapWithSlippage` takes the route as an argument; the self-searching `CC_` twin
+    // does the same search on chain and measures 7,145,298 gas on the worst case, 3.57x OVER
+    // the ~2,000,000 ceiling. So the bundle is not an optimisation, it is what makes a
+    // multi-hop swap mineable at all.
+    //
+    // This call used to omit it entirely, which Pact does not reject: a short call PARTIALLY
+    // APPLIES and yields a closure, so the transaction would have been built around a value
+    // that is not a swap.
+    const bundle = await buildSmartSwapBundle({
+      inputId: params.inputId,
+      outputId: params.outputId,
+      inputAmount: Number(amountDecimal),
+      onProgress: params.onProgress,
+    });
+    if (!bundle) {
+      // `URC_HopperActive` searches ACTIVE pools only. No route means the swap cannot happen,
+      // and refusing here costs nothing where submitting would cost gas to be refused.
+      throw new Error(
+        `No active route from ${params.inputId} to ${params.outputId}. The pools that would ` +
+        `connect them are inactive or do not exist.`,
+      );
+    }
+
+    const pactCode = `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_SmartSwapWithSlippage "${params.patronKeypair.address}" "${params.account}" "${params.inputId}" ${amountDecimal} "${params.outputId}" (read-msg 'slippage-bounds) (read-msg 'bundle))`;
 
     const gasLimit = 1_500_000;
 
@@ -137,6 +163,10 @@ export async function executeSmartSwapWithSlippage(
           pred: "keys-all",
         })
         .addData("slippage-bounds", slippageObj as any)
+        // via the data payload rather than an inlined object literal: the same route the
+        // slippage bounds already take, and it keeps a nested object out of the code string
+        // where a quoting slip would be silent.
+        .addData("bundle", bundle as any)
         .setMeta({
           senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
         ...stoaGasMeta(safeCreationTime()),
@@ -185,7 +215,24 @@ export async function executeSmartSwapNoSlippage(
     const amountStr = typeof params.inputAmount === "string" ? params.inputAmount : params.inputAmount.toString();
     const amountDecimal = amountStr.includes(".") ? amountStr : `${amountStr}.0`;
 
-    const pactCode = `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_SmartSwapNoSlippage "${params.patronKeypair.address}" "${params.account}" "${params.inputId}" ${amountDecimal} "${params.outputId}")`;
+    // The route bundle -- same reason as the slippage variant: `CC_SmartSwapNoSlippage`, the
+    // self-searching twin, measures 7,145,298 gas on the worst case against a ~2,000,000
+    // ceiling. This entrypoint takes the route instead, and omitting it does not error --
+    // Pact partially applies and yields a closure.
+    const bundle = await buildSmartSwapBundle({
+      inputId: params.inputId,
+      outputId: params.outputId,
+      inputAmount: Number(amountDecimal),
+      onProgress: params.onProgress,
+    });
+    if (!bundle) {
+      throw new Error(
+        `No active route from ${params.inputId} to ${params.outputId}. The pools that would ` +
+        `connect them are inactive or do not exist.`,
+      );
+    }
+
+    const pactCode = `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_SmartSwapNoSlippage "${params.patronKeypair.address}" "${params.account}" "${params.inputId}" ${amountDecimal} "${params.outputId}" (read-msg 'bundle))`;
 
     const gasLimit = 1_500_000;
 
@@ -196,6 +243,7 @@ export async function executeSmartSwapNoSlippage(
           keys: [params.guardKeypair.publicKey],
           pred: "keys-all",
         })
+        .addData("bundle", bundle as any)
         .setMeta({
           senderAccount: STOA_AUTONOMIC_OURONETGASSTATION,
         ...stoaGasMeta(safeCreationTime()),

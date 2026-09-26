@@ -189,6 +189,12 @@ export interface SmartSwapExecutionParams {
   readonly inputAmount: string | number;
   readonly outputId: string;
   readonly slippage?: number;
+  /**
+   * Reports bundle-discovery progress. Every step it reports is a FREE `/local` read -- the
+   * route search, the boost path, one lookup per distinct pool -- so showing it live is honest
+   * rather than a fake spinner. Only the submission costs gas.
+   */
+  readonly onProgress?: (p: { stage: string; detail: string; fraction: number }) => void;
 }
 
 /** Response shape from URC_0008b_TrueFungibleLPEntry */

@@ -16,3 +16,5 @@
  * `@stoachain/stoa-core` and is consumed via its subpaths.
  */
 export {};
+
+export * from "./interactions/smartSwapBundle.js";

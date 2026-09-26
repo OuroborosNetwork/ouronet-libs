@@ -114,6 +114,21 @@ const keyset = { keys: ["guardpub"], pred: "keys-all" as const };
 const reader: PactReader = (pactCode: string) => {
   let data: unknown = "1.0";
   if (pactCode.includes("URC_Acquire")) data = ['(coin.TRANSFER "alice" "bob" 1.0)'];
+  // SmartSwap now assembles a route bundle before building, so its readers need answers with
+  // the right SHAPE -- a Hopper is {nodes, edges}, and a route of [BAR] means "no path", which
+  // would make the executor refuse before it ever builds a transaction. These fixtures exist
+  // so a GAS-PRICING test does not silently become a routing test.
+  else if (pactCode.includes("URC_HopperActive")) {
+    data = { nodes: ["IN", "OUT"], edges: ["POOL-1"], "output-values": [1.0] };
+  } else if (pactCode.includes("URC_ReadPathCache")) {
+    data = { nodes: ["|"], edges: [], "topology-version": 1 };   // a miss, so the trace runs
+  } else if (pactCode.includes("UR_PoolTokens")) {
+    data = ["FIRST-TOKEN", "OUT"];
+  } else if (pactCode.includes("UR_SilverStoaID")) {
+    data = "SSTOA";
+  } else if (pactCode.includes("UR_WrappedStoaID")) {
+    data = "WSTOA";
+  }
   else if (pactCode.includes("Slippage") || pactCode.includes("URC_")) data = ["1.0", "1.0"];
   return Promise.resolve({ result: { status: "success", data } } as any);
 };
