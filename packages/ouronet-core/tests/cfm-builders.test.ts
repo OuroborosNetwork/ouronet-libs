@@ -73,6 +73,9 @@ import {
 // ─── Canonical fixture values (used across many tests) ──────────────────────
 
 const PATRON   = "ouro:PATRON-A";
+// The account that ACTS. Distinct from PATRON, which only pays -- these tests
+// previously conflated the two because the builders took one argument for both.
+const EXECUTOR = "ouro:EXECUTOR-A";
 const RESIDENT = "ouro:RESIDENT-B";
 const SENDER   = RESIDENT;
 const RECEIVER = "ouro:RECEIVER-C";
@@ -323,7 +326,7 @@ describe("buildFirestarterPactCode", () => {
 describe("buildWrapStoaPactCode", () => {
   const WRAPPER = "ouro:WRAPPER-W";
 
-  it("emits the canonical 3-arg C_WrapStoa shape", () => {
+  it("emits the canonical 4-arg C_WrapStoa shape", () => {
     expect(
       buildWrapStoaPactCode({ patron: PATRON, wrapper: WRAPPER, amount: "5" }),
     ).toBe(
@@ -347,7 +350,7 @@ describe("buildWrapStoaPactCode", () => {
 describe("buildWrapUrStoaPactCode", () => {
   const WRAPPER = "ouro:WRAPPER-W";
 
-  it("emits the canonical 3-arg C_WrapUrStoa shape", () => {
+  it("emits the canonical 4-arg C_WrapUrStoa shape", () => {
     expect(
       buildWrapUrStoaPactCode({ patron: PATRON, wrapper: WRAPPER, amount: "5" }),
     ).toBe(
@@ -369,7 +372,7 @@ describe("buildWrapUrStoaPactCode", () => {
 describe("buildUnwrapStoaPactCode", () => {
   const UNWRAPPER = "ouro:UNWRAPPER-U";
 
-  it("emits the canonical 3-arg C_UnwrapStoa shape", () => {
+  it("emits the canonical 4-arg C_UnwrapStoa shape", () => {
     expect(
       buildUnwrapStoaPactCode({ patron: PATRON, unwrapper: UNWRAPPER, amount: "10" }),
     ).toBe(
@@ -417,7 +420,7 @@ describe("buildUnwrapStoaWithCreateAccountPactCode", () => {
 describe("buildUnwrapUrStoaPactCode", () => {
   const UNWRAPPER = "ouro:UNWRAPPER-U";
 
-  it("emits the canonical 3-arg C_UnwrapUrStoa shape", () => {
+  it("emits the canonical 4-arg C_UnwrapUrStoa shape", () => {
     expect(
       buildUnwrapUrStoaPactCode({ patron: PATRON, unwrapper: UNWRAPPER, amount: "10" }),
     ).toBe(
@@ -448,7 +451,7 @@ describe("buildUnwrapUrStoaWithCreateAccountPactCode", () => {
 describe("buildStakeUrStoaPactCode", () => {
   const PK = "k:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
 
-  it("emits the canonical 2-arg coin.C_URV|Stake shape", () => {
+  it("emits the canonical 3-arg coin.C_URV|Stake shape", () => {
     expect(
       buildStakeUrStoaPactCode({ paymentKeyAddress: PK, amount: "100" }),
     ).toBe(
@@ -471,7 +474,7 @@ describe("buildStakeUrStoaPactCode", () => {
 describe("buildUnstakeUrStoaPactCode", () => {
   const PK = "k:abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
 
-  it("emits the canonical 2-arg coin.C_URV|Unstake shape", () => {
+  it("emits the canonical 3-arg coin.C_URV|Unstake shape", () => {
     expect(
       buildUnstakeUrStoaPactCode({ paymentKeyAddress: PK, amount: "100" }),
     ).toBe(
@@ -898,61 +901,67 @@ describe("buildChangeOwnershipPactCode", () => {
   const SWPAIR    = "swp:OURO-GSTOA-W-pair-123";
   const NEW_OWNER = "ouro:NEW-OWNER-D";
 
-  it("emits the canonical 3-arg C_ChangeOwnership shape", () => {
+  it("emits the canonical 4-arg C_ChangeOwnership shape", () => {
     expect(
       buildChangeOwnershipPactCode({
         patron:   PATRON,
+        executor: EXECUTOR,
         swpair:   SWPAIR,
         newOwner: NEW_OWNER,
       }),
     ).toBe(
-      `(ouronet-ns.TS01-C3.SWP|C_ChangeOwnership "${PATRON}" "${SWPAIR}" "${NEW_OWNER}")`,
+      `(ouronet-ns.TS01-C3.SWP|C_ChangeOwnership "${PATRON}" "${EXECUTOR}" "${NEW_OWNER}" "${SWPAIR}")`,
     );
   });
 
   it("uses the SWP module + TS01-C3 namespace + C_ChangeOwnership function", () => {
     const code = buildChangeOwnershipPactCode({
-      patron: "p", swpair: "s", newOwner: "n",
+      patron: "p", executor: "e", swpair: "s", newOwner: "n",
     });
     expect(code).toContain(".TS01-C3.SWP|C_ChangeOwnership ");
-    // Argument ORDER guard — patron → swpair → new-owner.
-    expect(code.indexOf(`"p"`)).toBeLessThan(code.indexOf(`"s"`));
-    expect(code.indexOf(`"s"`)).toBeLessThan(code.indexOf(`"n"`));
+    // Argument ORDER guard -- patron -> executor -> executee(new-owner) -> swpair.
+    // NOT alphabetical and NOT the old order: the canon is patron 1st, executor 2nd,
+    // executee 3rd, and the ENTITY comes last. The previous guard asserted
+    // patron -> swpair -> new-owner and passed for months against a builder the
+    // deployed contract would have rejected.
+    expect(code.indexOf(`"p"`)).toBeLessThan(code.indexOf(`"e"`));
+    expect(code.indexOf(`"e"`)).toBeLessThan(code.indexOf(`"n"`));
+    expect(code.indexOf(`"n"`)).toBeLessThan(code.indexOf(`"s"`));
   });
 });
 
 describe("buildModifyWeightsPactCode", () => {
   const SWPAIR = "swp:OURO-GSTOA-W-pair-123";
 
-  it("emits the canonical 3-arg C_ModifyWeights shape with a [decimal] list literal", () => {
+  it("emits the canonical 4-arg C_ModifyWeights shape with a [decimal] list literal", () => {
     expect(
       buildModifyWeightsPactCode({
-        patron:     PATRON,
+        patron:     PATRON, executor: EXECUTOR,
         swpair:     SWPAIR,
         newWeights: ["0.5", "0.3", "0.2"],
       }),
     ).toBe(
-      `(ouronet-ns.TS01-C3.SWP|C_ModifyWeights "${PATRON}" "${SWPAIR}" [0.5 0.3 0.2])`,
+      `(ouronet-ns.TS01-C3.SWP|C_ModifyWeights "${PATRON}" "${EXECUTOR}" "${SWPAIR}" [0.5 0.3 0.2])`,
     );
   });
 
   it("pads integer-form weights to x.0 (Pact decimal lexer rejects bare integers)", () => {
     const code = buildModifyWeightsPactCode({
-      patron: "p", swpair: "s", newWeights: ["1"],
+      patron: "p", executor: "e", swpair: "s", newWeights: ["1"],
     });
     expect(code).toContain("[1.0]");
   });
 
   it("preserves 4-decimal precision weights verbatim", () => {
     const code = buildModifyWeightsPactCode({
-      patron: "p", swpair: "s", newWeights: ["0.3333", "0.3333", "0.3334"],
+      patron: "p", executor: "e", swpair: "s", newWeights: ["0.3333", "0.3333", "0.3334"],
     });
     expect(code).toContain("[0.3333 0.3333 0.3334]");
   });
 
   it("uses the SWP module + TS01-C3 namespace + C_ModifyWeights function", () => {
     const code = buildModifyWeightsPactCode({
-      patron: "p", swpair: "s", newWeights: ["0.5", "0.5"],
+      patron: "p", executor: "e", swpair: "s", newWeights: ["0.5", "0.5"],
     });
     expect(code).toContain(".TS01-C3.SWP|C_ModifyWeights ");
     // Argument ORDER guard — patron → swpair → weights-list.
@@ -964,22 +973,22 @@ describe("buildModifyWeightsPactCode", () => {
 describe("buildToggleSwapCapabilityPactCode", () => {
   const SWPAIR = "swp:OURO-GSTOA-W-pair-123";
 
-  it("emits the canonical 3-arg C_ToggleSwapCapability shape (toggle=true)", () => {
+  it("emits the canonical 4-arg C_ToggleSwapCapability shape (toggle=true)", () => {
     expect(
-      buildToggleSwapCapabilityPactCode({ patron: PATRON, swpair: SWPAIR, toggle: true }),
+      buildToggleSwapCapabilityPactCode({ patron: PATRON, executor: EXECUTOR, swpair: SWPAIR, toggle: true }),
     ).toBe(
-      `(ouronet-ns.TS01-C3.SWP|C_ToggleSwapCapability "${PATRON}" "${SWPAIR}" true)`,
+      `(ouronet-ns.TS01-C3.SWP|C_ToggleSwapCapability "${PATRON}" "${EXECUTOR}" "${SWPAIR}" true)`,
     );
   });
 
   it("emits bare `false` (Pact bool literal, not quoted)", () => {
-    const code = buildToggleSwapCapabilityPactCode({ patron: "p", swpair: "s", toggle: false });
+    const code = buildToggleSwapCapabilityPactCode({ patron: "p", executor: "e", swpair: "s", toggle: false });
     expect(code).toMatch(/ false\)$/);
     expect(code).not.toContain(`"false"`);
   });
 
   it("uses the SWP module + TS01-C3 namespace + C_ToggleSwapCapability function", () => {
-    const code = buildToggleSwapCapabilityPactCode({ patron: "p", swpair: "s", toggle: true });
+    const code = buildToggleSwapCapabilityPactCode({ patron: "p", executor: "e", swpair: "s", toggle: true });
     expect(code).toContain(".TS01-C3.SWP|C_ToggleSwapCapability ");
     // Distinct from C_ToggleAddLiquidity — guard against accidental shared-source typo
     expect(code).not.toContain("C_ToggleAddLiquidity");
@@ -991,16 +1000,16 @@ describe("buildToggleSwapCapabilityPactCode", () => {
 describe("buildToggleAddLiquidityPactCode", () => {
   const SWPAIR = "swp:OURO-GSTOA-W-pair-123";
 
-  it("emits the canonical 3-arg C_ToggleAddLiquidity shape (toggle=true)", () => {
+  it("emits the canonical 4-arg C_ToggleAddLiquidity shape (toggle=true)", () => {
     expect(
-      buildToggleAddLiquidityPactCode({ patron: PATRON, swpair: SWPAIR, toggle: true }),
+      buildToggleAddLiquidityPactCode({ patron: PATRON, executor: EXECUTOR, swpair: SWPAIR, toggle: true }),
     ).toBe(
-      `(ouronet-ns.TS01-C3.SWP|C_ToggleAddLiquidity "${PATRON}" "${SWPAIR}" true)`,
+      `(ouronet-ns.TS01-C3.SWP|C_ToggleAddLiquidity "${PATRON}" "${EXECUTOR}" "${SWPAIR}" true)`,
     );
   });
 
   it("uses the SWP module + TS01-C3 namespace + C_ToggleAddLiquidity function (NOT C_ToggleSwapCapability)", () => {
-    const code = buildToggleAddLiquidityPactCode({ patron: "p", swpair: "s", toggle: false });
+    const code = buildToggleAddLiquidityPactCode({ patron: "p", executor: "e", swpair: "s", toggle: false });
     expect(code).toContain(".TS01-C3.SWP|C_ToggleAddLiquidity ");
     expect(code).not.toContain("C_ToggleSwapCapability");
     expect(code).toMatch(/ false\)$/);
@@ -1010,21 +1019,21 @@ describe("buildToggleAddLiquidityPactCode", () => {
 describe("buildModifyCanChangeOwnerPactCode", () => {
   const SWPAIR = "swp:OURO-GSTOA-W-pair-123";
 
-  it("emits the canonical 3-arg C_ModifyCanChangeOwner shape (new-boolean=true)", () => {
+  it("emits the canonical 4-arg C_ModifyCanChangeOwner shape (new-boolean=true)", () => {
     expect(
       buildModifyCanChangeOwnerPactCode({
-        patron:     PATRON,
+        patron:     PATRON, executor: EXECUTOR,
         swpair:     SWPAIR,
         newBoolean: true,
       }),
     ).toBe(
-      `(ouronet-ns.TS01-C3.SWP|C_ModifyCanChangeOwner "${PATRON}" "${SWPAIR}" true)`,
+      `(ouronet-ns.TS01-C3.SWP|C_ModifyCanChangeOwner "${PATRON}" "${EXECUTOR}" "${SWPAIR}" true)`,
     );
   });
 
   it("emits bare `false` (Pact bool literal — NOT quoted as a string)", () => {
     const code = buildModifyCanChangeOwnerPactCode({
-      patron: "p", swpair: "s", newBoolean: false,
+      patron: "p", executor: "e", swpair: "s", newBoolean: false,
     });
     // The boolean must NOT be wrapped in quotes — Pact's bool type is the
     // unquoted token `true` / `false`. Quoting it would make it a string,
@@ -1035,7 +1044,7 @@ describe("buildModifyCanChangeOwnerPactCode", () => {
 
   it("uses the SWP module + TS01-C3 namespace + C_ModifyCanChangeOwner function", () => {
     const code = buildModifyCanChangeOwnerPactCode({
-      patron: "p", swpair: "s", newBoolean: true,
+      patron: "p", executor: "e", swpair: "s", newBoolean: true,
     });
     expect(code).toContain(".TS01-C3.SWP|C_ModifyCanChangeOwner ");
     // Argument ORDER guard — patron → swpair → new-boolean.
@@ -1095,14 +1104,14 @@ describe("every builder produces a valid Pact call shape", () => {
     () => buildAwakePactCode({ patron: "a", awaker: "b", dpof: "d", nonce: 1 }),
     () => buildSlumberPactCode({ patron: "a", merger: "b", dpof: "d", nonces: [1] }),
     () => buildFirestarterPactCode({ firestarter: "a" }),
-    () => buildChangeOwnershipPactCode({ patron: "a", swpair: "b", newOwner: "c" }),
+    () => buildChangeOwnershipPactCode({ patron: "a", executor: "e", swpair: "b", newOwner: "c" }),
     () => buildWrapStoaPactCode({ patron: "a", wrapper: "b", amount: "1" }),
     () => buildWrapUrStoaPactCode({ patron: "a", wrapper: "b", amount: "1" }),
     () => buildUnwrapStoaPactCode({ patron: "a", unwrapper: "b", amount: "1" }),
     () => buildUnwrapUrStoaPactCode({ patron: "a", unwrapper: "b", amount: "1" }),
     () => buildRotateSovereignPactCode({ patron: "a", account: "b", newSovereign: "c" }),
     () => buildRotateGovernorPactCode({ patron: "a", account: "b", governorExpr: "(create-user-guard (m.f))" }),
-    () => buildReleaseStoicTagPactCode({ patron: "a", tagName: "b" }),
+    () => buildReleaseStoicTagPactCode({ patron: "a", executor: "e", tagName: "b" }),
     () => buildRegisterStoicTagPactCode({ patron: "a", tagName: "b", accountAddress: "c" }),
     () => buildDeployStandardAccountPactCode({ account: "a", kadenaAddress: "k", publicKey: "p" }),
     () => buildAddLiquidityPactCode({ patron: "a", account: "b", swpair: "s", inputAmounts: ["1"] }),
@@ -1126,7 +1135,7 @@ describe("every builder produces a valid Pact call shape", () => {
 // ─── TS01-C1.DALOS — RotateSovereign (Smart-account auth-path mutation) ─────
 
 describe("buildRotateSovereignPactCode", () => {
-  it("emits the canonical 3-arg C_RotateSovereign shape", () => {
+  it("emits the canonical 4-arg C_RotateSovereign shape", () => {
     expect(
       buildRotateSovereignPactCode({
         patron:       PATRON,
@@ -1159,7 +1168,7 @@ describe("buildRotateSovereignPactCode", () => {
 });
 
 describe("buildRotateGovernorPactCode (v4.3.3)", () => {
-  it("emits the canonical 3-arg C_RotateGovernor shape with an inline guard expression", () => {
+  it("emits the canonical 4-arg C_RotateGovernor shape with an inline guard expression", () => {
     expect(
       buildRotateGovernorPactCode({
         patron:       PATRON,
@@ -1232,29 +1241,29 @@ describe("buildNonKeyGuardExpr (v4.3.3)", () => {
 });
 
 describe("buildReleaseStoicTagPactCode (v4.3.3)", () => {
-  it("emits the canonical 2-arg C_ReleaseStoicTag shape", () => {
+  it("emits the canonical 3-arg C_ReleaseStoicTag shape", () => {
     expect(
-      buildReleaseStoicTagPactCode({ patron: PATRON, tagName: "AncientHodler" }),
+      buildReleaseStoicTagPactCode({ patron: PATRON, executor: EXECUTOR, tagName: "AncientHodler" }),
     ).toBe(
-      `(ouronet-ns.TS01-C4.CODEX|C_ReleaseStoicTag "${PATRON}" "AncientHodler")`,
+      `(ouronet-ns.TS01-C4.CODEX|C_ReleaseStoicTag "${PATRON}" "${EXECUTOR}" "AncientHodler")`,
     );
   });
 
   it("uses the TS01-C4.CODEX module + C_ReleaseStoicTag function, patron before tag", () => {
-    const code = buildReleaseStoicTagPactCode({ patron: "p", tagName: "t" });
+    const code = buildReleaseStoicTagPactCode({ patron: "p", executor: "e", tagName: "t" });
     expect(code).toContain(".TS01-C4.CODEX|C_ReleaseStoicTag ");
     expect(code.indexOf(`"p"`)).toBeLessThan(code.indexOf(`"t"`));
   });
 
   it("passes the tag name through verbatim (DALOS glyphs, no § sigil)", () => {
-    const code = buildReleaseStoicTagPactCode({ patron: "Ѻ.PATRON", tagName: "Σ₳ΦДжΞ" });
+    const code = buildReleaseStoicTagPactCode({ patron: "Ѻ.PATRON", executor: "e", tagName: "Σ₳ΦДжΞ" });
     expect(code).toContain(`"Σ₳ΦДжΞ"`);
     expect(code).not.toContain("§");
   });
 });
 
 describe("buildRegisterStoicTagPactCode (v4.3.3)", () => {
-  it("emits the canonical 3-arg C_RegisterStoicTag shape", () => {
+  it("emits the canonical 4-arg C_RegisterStoicTag shape", () => {
     expect(
       buildRegisterStoicTagPactCode({ patron: PATRON, tagName: "AncientHodler", accountAddress: "Ѻ.ACCT" }),
     ).toBe(
@@ -1346,7 +1355,7 @@ describe("buildRotateGuardPactCode (v4.3.0)", () => {
 });
 
 describe("buildRotateKadenaPactCode (v4.3.0)", () => {
-  it("emits the canonical 3-arg C_RotateKadena shape", () => {
+  it("emits the canonical 4-arg C_RotateKadena shape", () => {
     expect(
       buildRotateKadenaPactCode({
         patron: PATRON,

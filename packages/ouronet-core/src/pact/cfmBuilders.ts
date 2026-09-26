@@ -588,6 +588,13 @@ export function buildFirestarterPactCode(p: {
 }
 
 /**
+ * EXECUTOR (added 2026-09-26). The patron/executor canon sweep re-signed these six
+ * entrypoints: `patron` PAYS, `executor` ACTS and is the account whose ownership the
+ * chain enforces. The modals were updated to pass it and these builders were not, so
+ * the UI failed TYPECHECK (TS2353 x5) rather than mis-executing -- the one failure mode
+ * that is loud. Argument ORDER and position taken from Deploy/OURONET-REGISTRY.json,
+ * which is generated from the DEPLOYED module rather than from these files.
+ *
  * ChangeOwnership — transfer ownership of an existing SWP-pair (liquidity
  * pool) from its current pool-owner to a new Ouronet account. Gated by
  * the pool's `can-change-owner` flag (must be true) and signed by the
@@ -598,10 +605,11 @@ export function buildFirestarterPactCode(p: {
  */
 export function buildChangeOwnershipPactCode(p: {
   patron:   string;
+  executor: string;   // the CURRENT pool owner -- the account the chain checks
   swpair:   string;
-  newOwner: string;
+  newOwner: string;   // becomes `executee` on chain
 }): string {
-  return `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_ChangeOwnership "${p.patron}" "${p.swpair}" "${p.newOwner}")`;
+  return `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_ChangeOwnership "${p.patron}" "${p.executor}" "${p.newOwner}" "${p.swpair}")`;
 }
 
 /**
@@ -620,11 +628,12 @@ export function buildChangeOwnershipPactCode(p: {
  */
 export function buildModifyWeightsPactCode(p: {
   patron:     string;
+  executor:   string;   // the pool owner -- the account the chain checks
   swpair:     string;
   newWeights: string[];   // raw decimal strings; builder formats each
 }): string {
   const weightList = `[${p.newWeights.map(w => formatDecimalForPact(w)).join(" ")}]`;
-  return `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_ModifyWeights "${p.patron}" "${p.swpair}" ${weightList})`;
+  return `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_ModifyWeights "${p.patron}" "${p.executor}" "${p.swpair}" ${weightList})`;
 }
 
 /**
@@ -636,10 +645,11 @@ export function buildModifyWeightsPactCode(p: {
  */
 export function buildToggleSwapCapabilityPactCode(p: {
   patron: string;
+  executor: string;   // the pool owner -- the account the chain checks
   swpair: string;
   toggle: boolean;
 }): string {
-  return `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_ToggleSwapCapability "${p.patron}" "${p.swpair}" ${p.toggle})`;
+  return `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_ToggleSwapCapability "${p.patron}" "${p.executor}" "${p.swpair}" ${p.toggle})`;
 }
 
 /**
@@ -652,10 +662,11 @@ export function buildToggleSwapCapabilityPactCode(p: {
  */
 export function buildToggleAddLiquidityPactCode(p: {
   patron: string;
+  executor: string;   // the pool owner -- the account the chain checks
   swpair: string;
   toggle: boolean;
 }): string {
-  return `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_ToggleAddLiquidity "${p.patron}" "${p.swpair}" ${p.toggle})`;
+  return `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_ToggleAddLiquidity "${p.patron}" "${p.executor}" "${p.swpair}" ${p.toggle})`;
 }
 
 /**
@@ -670,10 +681,11 @@ export function buildToggleAddLiquidityPactCode(p: {
  */
 export function buildModifyCanChangeOwnerPactCode(p: {
   patron:     string;
+  executor:   string;   // the pool owner -- the account the chain checks
   swpair:     string;
   newBoolean: boolean;
 }): string {
-  return `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_ModifyCanChangeOwner "${p.patron}" "${p.swpair}" ${p.newBoolean})`;
+  return `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_ModifyCanChangeOwner "${p.patron}" "${p.executor}" "${p.swpair}" ${p.newBoolean})`;
 }
 
 // ─── TS01-C3.SWP family — liquidity-pool ops (Add / Remove / Fuel) ───────────
@@ -971,9 +983,10 @@ export function buildNonKeyGuardExpr(p: {
  */
 export function buildReleaseStoicTagPactCode(p: {
   patron:  string;
+  executor: string;   // the account the tag is bound to -- the chain checks its ownership
   tagName: string;
 }): string {
-  return `(${KADENA_NAMESPACE}.TS01-C4.CODEX|C_ReleaseStoicTag "${p.patron}" "${p.tagName}")`;
+  return `(${KADENA_NAMESPACE}.TS01-C4.CODEX|C_ReleaseStoicTag "${p.patron}" "${p.executor}" "${p.tagName}")`;
 }
 
 /**
