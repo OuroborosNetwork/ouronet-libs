@@ -9,6 +9,55 @@ This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3
 **MAJOR — six transaction builders gained a required `executor`. They were emitting Pact the
 deployed contracts reject, and OuronetUI would not compile.**
 
+### Breaking: `getHibernateFee` throws instead of guessing; four phantom readers gone
+
+`getHibernateFee` called `DPL-UR.URC_0012_HibernateFee`, a name that has **never existed in any
+Pact source in the Ouronet repo** — `git log -S` over the full history finds it zero times. Every
+call was a resolution error, the `catch` always fired, and the returned figure was this package's
+own hardcode, `0.12 - 0.000008 * days`, under a comment reading *"function may not be deployed
+yet"*.
+
+**The hardcode was numerically correct, which is why it lasted.** Mainnet holds
+`peak = 120` promille and `decay = 0.008` promille/day, so that expression *is*
+`max(120 - 0.008·d, 0) / 1000`. But `ATS|C_SetHibernationFees` is a live entrypoint: the day a pool
+owner retunes either number, every consumer keeps returning 12% and nothing fails.
+
+Now one read fetches `UR_Hibernate` / `UR_PeakHibernatePromile` / `UR_HibernateDecay` /
+`UR_Royalty` and applies the chain's own clamp. **It throws on failure** rather than substituting
+an estimate — both callers already catch, and a fallback one layer further down is invisible to
+the layer that has to tell the user the figure is approximate.
+
+New `getHibernationFeeBreakdown` returns every governed input plus `totalFraction`. That last one
+matters: the pool takes its **royalty off the deposit before** hibernation applies, so the true
+day-zero deduction is 12.88%, not 12%, and a single-number display understates it.
+
+Agreement with the contract is pinned, not asserted: `tests/pension-hibernate-fee.test.ts` drives
+`deriveHibernationFee` with recorded output from `ATS::URC_RewardBearingTokenAmountsWithHibernation`
+(118,800 of 990,000 at day 0; 115,909.2 at day 365).
+
+Two tests in `v3-3-5-smoke.test.ts` were rewritten. One mocked the success path as
+`{decimal: "0.99"}` — the wire shape of a function that never existed, so it passed against a mock
+of a phantom. The other asserted the fallback under the name *"graceful-degradation contract"*,
+which named the only code path a degradation and is what kept it in place.
+
+**Removed** (each named a function that does not exist, each with no live caller):
+
+| export | named | why it cannot be renamed into correctness |
+|---|---|---|
+| `primordialPrices` | `DSP.URC_PrimordialPrices` | DSP declares no price reader; sole reference was a commented-out import |
+| `filterKeysForInfo` | `TFT.DPTF-DPMF-ATS\|UR_FilterKeysForInfo` | TFT has no `FilterKeys` member under any prefix; zero callers |
+
+**Repointed**: `getOuroDispoCapacity` named `DALOS.UR_DISPOSupply` (DALOS's dispo readers are all
+zero-arg treasury parameters, nothing per-account) and now reads `O-UI-THREE.URC_Dispo`, taking
+the raw `ouro-dispo-capacity-hover` rather than the formatted string — a caller handed the format
+cannot get the precision back.
+
+**Fixed at source**: `getInfoSinglePoolSwap` / `getInfoMultiPoolSwap` named
+`INFO-ONE.SWP|INFO_SinglePoolSwap` / `MultiPoolSwap`. The deployed names are
+`INFO_SWP|SingleSwapNoSlippage` / `MultiSwapNoSlippage` — same arity, same parameter order. Nine
+sibling previews were repaired earlier by a prefix flip; these two were missed because their
+**tail** moved too, once a `WithSlippage` variant existed.
+
 ### Breaking: `executor` on six builders
 
 The patron/executor canon sweep re-signed these entrypoints so that `patron` PAYS and

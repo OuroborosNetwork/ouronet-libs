@@ -120,23 +120,39 @@ afterEach(() => {
 });
 
 // ══ pensionFunctions — getHibernateFee ══════════════════════════════════════
+//
+// REWRITTEN 2026-09-26. What stood here asserted two things that were both wrong:
+//
+//   1. a success path mocked as `{decimal: "0.99"}` -- the wire shape of
+//      `DPL-UR.URC_0012_HibernateFee`, a function that has never existed in any Pact source in
+//      the Ouronet repo. The test passed against a mock of a phantom.
+//   2. a "graceful-degradation contract" asserting the catch returned `0.12 - 0.000008*days`.
+//      That branch was not a degradation path, it was the ONLY path, and the test named the
+//      permanent fallback a contract -- which is what kept it in place.
+//
+// The function now reads `UR_Hibernate` / `UR_PeakHibernatePromile` / `UR_HibernateDecay` /
+// `UR_Royalty` in one call and THROWS on failure, so its callers can label an estimate as one.
+// Agreement with the chain's own arithmetic is pinned separately, against recorded mainnet
+// output, in `tests/pension-hibernate-fee.test.ts`.
 describe("v3.3.5 smoke — pensionFunctions.getHibernateFee", () => {
-  it("returns the parsed decimal on success path", async () => {
-    setPactReader(successReader({ decimal: "0.99" }));
-    const out = await getHibernateFee("pool-id", 100);
-    expect(out).toBe(0.99);
+  it("derives the fee from the pool's own parameters", async () => {
+    // Mainnet values for GoldenStoaPillar-O136CBn22ncY.
+    setPactReader(successReader({ on: true, peak: 120, decay: 0.008, royalty: 10 }));
+    const out = await getHibernateFee("GoldenStoaPillar-O136CBn22ncY", 365);
+    expect(out).toBeCloseTo(0.11708, 9);
   });
 
-  it("returns the locally-computed fallback on thrown read (graceful-degradation contract)", async () => {
+  it("follows the pool when its parameters differ from the retired hardcode", async () => {
+    // The case the old fallback could not express: it returned 0.12 at day zero whatever the
+    // pool was set to. ATS|C_SetHibernationFees makes this reachable in production.
+    setPactReader(successReader({ on: true, peak: 60, decay: 0.004, royalty: 10 }));
+    expect(await getHibernateFee("pool-id", 0)).toBeCloseTo(0.06, 9);
+  });
+
+  it("throws rather than substituting a local estimate", async () => {
     setPactReader(throwingReader);
-    // Suppress any logger noise from the catch (the function's catch is
-    // SILENT — no getLogger() call — but install a no-op spy regardless
-    // so future-self changes don't muddy the assertion.)
     setLogger({ warn: vi.fn(), error: vi.fn(), info: vi.fn() });
-    // Fallback formula per source: 0.12 - 0.000008 * lockDays, clamped
-    // to non-negative. For lockDays=100: 0.12 - 0.0008 = 0.1192.
-    const out = await getHibernateFee("pool-id", 100);
-    expect(out).toBeCloseTo(0.1192, 6);
+    await expect(getHibernateFee("pool-id", 100)).rejects.toThrow();
   });
 });
 

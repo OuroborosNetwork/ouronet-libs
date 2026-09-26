@@ -231,18 +231,6 @@ export async function getOuronetKdaDetails(address: string): Promise<any> {
   };
 }
 
-// (namespace.DSP.URC_PrimordialPrices)
-
-export async function primordialPrices(): Promise<any> {
-  const response = await pactRead(`(${KADENA_NAMESPACE}.DSP.URC_PrimordialPrices)`, { tier: "T6" });
-
-  if (!response || !response.result) {
-    throw new Error("Failed to retrieve data from the transaction.");
-  }
-
-  return (response.result as any)?.data || null;
-}
-
 // DALOS.UR_Elite account
 export async function eliteAccount(address: string): Promise<any> {
   const response = await pactRead(`(${KADENA_NAMESPACE}.DALOS.UR_Elite "${address}")`, { tier: "T6" });
@@ -254,21 +242,17 @@ export async function eliteAccount(address: string): Promise<any> {
 }
 
 
-export async function filterKeysForInfo(
-  address: string,
-  table: number = 1,
-  mode: boolean = true,
-): Promise<any> {
-  const pactCode = `(${KADENA_NAMESPACE}.TFT.DPTF-DPMF-ATS|UR_FilterKeysForInfo "${address}" ${table} ${mode})`;
-
-  const response = await pactRead(pactCode, { tier: "T3" });
-
-  if (!response || !response.result) {
-    throw new Error("Failed to retrieve data from the transaction.");
-  }
-
-  return (response.result as any)?.data || null;
-}
+// REMOVED 2026-09-26: `primordialPrices` and `filterKeysForInfo`.
+//
+// Both named functions that DO NOT EXIST and never did -- `DSP.URC_PrimordialPrices` (DSP
+// declares URC_DailyKOSON / URC_DailyOURO / URC_Gassless / URC_StageTwoResidual /
+// URHC_StageTwoPlan and nothing else) and `TFT.DPTF-DPMF-ATS|UR_FilterKeysForInfo` (TFT declares
+// no FilterKeys member under any prefix; the DPMF->DPOF rename is a red herring, neither spelling
+// resolves). Both are unreachable: `filterKeysForInfo` had zero callers anywhere, and
+// `primordialPrices`'s only reference is a COMMENTED-OUT import in wallet-context.tsx.
+//
+// Kept as a note rather than deleted silently, because an export that resolves to nothing is not
+// distinguishable from one that is merely unused until somebody asks the chain.
 
 // returns the price of the activation
 export async function usagePrice(tokenType: string = "standard"): Promise<any> {

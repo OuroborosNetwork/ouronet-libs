@@ -646,7 +646,7 @@ export async function getInfoFuel(
 
 /**
  * INFO_SinglePoolSwap — dirty read for single-input swap preview.
- * (ouronet-ns.INFO-ONE.SWP|INFO_SinglePoolSwap patron account swpair input-id input-amount output-id)
+ * (ouronet-ns.INFO-ONE.INFO_SWP|SingleSwapNoSlippage patron account swpair input-id input-amount output-id)
  */
 export async function getInfoSinglePoolSwap(
   patron: string,
@@ -658,7 +658,7 @@ export async function getInfoSinglePoolSwap(
 ): Promise<any | null> {
   try {
     const decAmount = formatDecimalForPact(inputAmount);
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.SWP|INFO_SinglePoolSwap "${patron}" "${account}" "${swpair}" "${inputId}" ${decAmount} "${outputId}")`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_SWP|SingleSwapNoSlippage "${patron}" "${account}" "${swpair}" "${inputId}" ${decAmount} "${outputId}")`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (!response?.result || response.result.status === "failure") return null;
     return response.result.data;
@@ -670,7 +670,7 @@ export async function getInfoSinglePoolSwap(
 
 /**
  * INFO_MultiPoolSwap — dirty read for multi-input swap preview.
- * (ouronet-ns.INFO-ONE.SWP|INFO_MultiPoolSwap patron account swpair input-ids input-amounts output-id)
+ * (ouronet-ns.INFO-ONE.INFO_SWP|MultiSwapNoSlippage patron account swpair input-ids input-amounts output-id)
  */
 export async function getInfoMultiPoolSwap(
   patron: string,
@@ -686,7 +686,7 @@ export async function getInfoMultiPoolSwap(
       const s = String(a);
       return s.includes(".") ? s : s + ".0";
     }).join(" ")}]`;
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.SWP|INFO_MultiPoolSwap "${patron}" "${account}" "${swpair}" ${pactInputIds} ${pactInputAmounts} "${outputId}")`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_SWP|MultiSwapNoSlippage "${patron}" "${account}" "${swpair}" ${pactInputIds} ${pactInputAmounts} "${outputId}")`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (!response?.result || response.result.status === "failure") return null;
     return response.result.data;
