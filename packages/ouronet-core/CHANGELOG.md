@@ -9,6 +9,42 @@ This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3
 **MAJOR — six transaction builders gained a required `executor`. They were emitting Pact the
 deployed contracts reject, and OuronetUI would not compile.**
 
+### The builder-arity guarantee now travels with the builders
+
+`OuronetUI/scripts/check-builder-arity.py` has been catching wrong builder arities — it found six.
+But it lives in the app, needs the Pact repo checked out beside it, and reads the app's
+`node_modules` copy of *this* package. So a consumer installing `@ouronet/ouronet-core` from the
+registry got none of that, and a regression introduced **here** stayed invisible until somebody
+rebuilt and ran a Python script in another repository.
+
+That gap was demonstrated, not assumed: breaking a builder in this package's source and re-running
+the Python checker **reported clean**.
+
+`tests/cfm-builders-vs-registry.test.ts` closes it. `@ouronet/talos-registry` is a devDependency
+carrying a pinned snapshot of the deployed surface, so the check needs no network and no sibling
+repo, and it runs on `npm test` in the package that owns the builders. 39 builders, 52 assertions.
+
+**It parses what a builder RETURNS, not its source template.** That distinction is the Python
+tool's actual bug: its counter matched `${…}` interpolations, so `(read-msg 'slippage-bounds)` was
+invisible and two correct builders sat excused as broken for weeks. Calling the builder and reading
+its output cannot make that mistake.
+
+Two things the new test found about itself while being written:
+
+- **A trailing `//` comment on a parameter ate the next field.** `amount: string;   // "k:<pub>"`
+  puts the comment before the next `;`, so the field after it was parsed as `undefined` — surfacing
+  only because `formatDecimalForPact` threw. A field whose loss did not reach a formatter would
+  have produced a call containing a literal `undefined` and the arity would have looked correct.
+- **The `coin.*` exemption is derived from the code, not a list of names.** The first draft named
+  the UrStoa builders explicitly and the guard immediately reported four more it did not know
+  about. A name list needs editing whenever one is added, and that edit is what gets skipped — so
+  the rule now tests the emitted string for a `coin.` call. Only `buildNonKeyGuardExpr` is named,
+  because nothing in its output identifies it as a guard expression rather than a call.
+
+Scope is stated in the file: this covers the builders in **this** package. OuronetUI's app-local
+overrides in `src/kadena/cfmBuilders.ts` win at runtime and only `check-builder-arity.py` reads
+both.
+
 ### Breaking: the KPay/StoicPay path — wrong module, wrong function, missing ceiling
 
 Three of the four kpay symbols were repairable, and the repair was not a rename in any of them.
