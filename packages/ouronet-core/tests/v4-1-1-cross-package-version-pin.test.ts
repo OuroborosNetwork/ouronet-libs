@@ -62,8 +62,12 @@ describe("cross-package version-pin consistency", () => {
     expect(coreNum, `core ${core.version} is below codex's floor ${range}`).toBeGreaterThanOrEqual(floorNum);
   });
 
-  it("the two packages carry independent version lines (codex 0.x, core 4.x)", () => {
-    expect(core.version).toMatch(/^4\./);
+  it("the two packages carry independent version lines", () => {
+    // The point is INDEPENDENCE -- codex on 0.x, core on its own line -- not any particular
+    // major. Pinning core to /^4\./ made this a snapshot of the day it was written, so the
+    // first genuine major bump failed a test whose own name says it is about independence.
     expect(codex.version).toMatch(/^0\./);
+    expect(core.version).not.toMatch(/^0\./);
+    expect(core.version.split(".")[0]).not.toBe(codex.version.split(".")[0]);
   });
 });

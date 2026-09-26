@@ -4,6 +4,65 @@ All notable changes to `@ouronet/ouronet-core`.
 
 This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3.3.8. v4.0.0 split it into a two-package npm workspace under `StoaChain/stoa-js` — chain-generic infrastructure moved out into [`@stoachain/stoa-core`](https://www.npmjs.com/package/@stoachain/stoa-core), this package retained the Ouronet-specific business logic. The `4.0.0` heading below is the first release after the split.
 
+## 5.0.0 — 2026-09-26
+
+**MAJOR — six transaction builders gained a required `executor`. They were emitting Pact the
+deployed contracts reject, and OuronetUI would not compile.**
+
+### Breaking: `executor` on six builders
+
+The patron/executor canon sweep re-signed these entrypoints so that `patron` PAYS and
+`executor` ACTS — two roles that used to be one argument. The builders here were never updated:
+
+| builder | was | now |
+|---|---|---|
+| `buildChangeOwnershipPactCode` | `(patron, swpair, newOwner)` | `(patron, executor, executee, swpair)` |
+| `buildModifyWeightsPactCode` | `(patron, swpair, weights)` | `+ executor` in slot 2 |
+| `buildToggleSwapCapabilityPactCode` | `(patron, swpair, toggle)` | `+ executor` in slot 2 |
+| `buildToggleAddLiquidityPactCode` | `(patron, swpair, toggle)` | `+ executor` in slot 2 |
+| `buildModifyCanChangeOwnerPactCode` | `(patron, swpair, bool)` | `+ executor` in slot 2 |
+| `buildReleaseStoicTagPactCode` | `(patron, tagName)` | `(patron, executor, tagName)` |
+
+`ChangeOwnership` is not a simple insertion — the pool id moved to LAST and `newOwner` became
+the canon's `executee`. All six orders were taken from `Deploy/OURONET-REGISTRY.json`, which is
+generated from the **deployed** modules; the builders' own doc comments still described the old
+shape and would have been the wrong source.
+
+**What a consumer sees:** every call site must now pass `executor` — the account whose
+ownership the chain enforces, which for the SWP five is the current pool owner.
+
+### Why this was not caught
+
+OuronetUI's modals already passed `executor`, so the app had been failing `tsc` with five
+TS2353 errors. Its `tsc -p tsconfig.json` is a project-references stub with `"files": []` —
+it checks nothing and exits 0.
+
+And the tests here were pinning the bug: seven cases asserted "the canonical 3-arg shape",
+comparing each builder against itself rather than against the chain. One carried an explicit
+`// Argument ORDER guard — patron → swpair → new-owner`.
+
+### New: `smartSwapBundle`
+
+`SWP|C_SmartSwap…` takes its route as an argument and both executors here were omitting it.
+Pact does not reject a short call — it partially applies and yields a closure.
+
+The bundle is not an optimisation. Measured on the worst case (6 hops, ~102 active pools):
+`CC_SmartSwap…` self-searching is **7,145,298 gas, 3.57x over the ~2,000,000 ceiling**;
+`C_SmartSwap…` bundle-based is **397,043**. The fallback cannot be mined at scale.
+
+`buildSmartSwapBundle()` implements the handoff's §4 sequence — route, boost path, deduped
+stoa-paths — entirely in free `/local` reads, with `onProgress` for a real discovery UI. A
+bundle built by it was fed to `INFO_SWP|SmartSwapNoSlippageBundle` on mainnet, which accepted
+it and priced the swap at 77 IGNIS.
+
+`SmartSwapExecutionParams` gains an optional `onProgress`.
+
+### Also in this release
+
+`feat: unify Chainweaver/EckoWallet, add the Stoa Dalos ("stoic") seed path` — landed
+separately and unreleased until now. See that commit for its own account; it also fixes a
+seed-type migration that would have silently rewritten a stoic seed to `koala` on next load.
+
 ## 4.6.0 — 2026-09-07
 
 **MINOR — chain peers re-pinned to 4.4.0; every transaction in the package now prices against the live Yin floor.**
