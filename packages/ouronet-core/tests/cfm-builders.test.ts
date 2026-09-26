@@ -1354,8 +1354,8 @@ describe("buildRotateGuardPactCode (v4.3.0)", () => {
   });
 });
 
-describe("buildRotateKadenaPactCode (v4.3.0)", () => {
-  it("emits the canonical 4-arg C_RotateKadena shape", () => {
+describe("buildRotateStoaPactCode (renamed from RotateKadena, 2026-09-26)", () => {
+  it("emits the canonical 4-arg C_RotateStoa shape", () => {
     expect(
       buildRotateKadenaPactCode({
         patron: PATRON,
@@ -1363,19 +1363,19 @@ describe("buildRotateKadenaPactCode (v4.3.0)", () => {
         newPaymentKey: "f".repeat(64),
       }),
     ).toBe(
-      `(ouronet-ns.TS01-C1.DALOS|C_RotateKadena "${PATRON}" "Ѻ.ACCT" "${"f".repeat(64)}")`,
+      `(ouronet-ns.TS01-C1.DALOS|C_RotateStoa "${PATRON}" "Ѻ.ACCT" "${"f".repeat(64)}")`,
     );
   });
 
-  it("uses the DALOS module + TS01-C1 namespace + C_RotateKadena function name", () => {
+  it("uses the DALOS module + TS01-C1 namespace + C_RotateStoa function name", () => {
     const code = buildRotateKadenaPactCode({
       patron: "p",
       account: "a",
       newPaymentKey: "k",
     });
     // Builder is named *RotatePaymentKey* in user-facing surfaces but the
-    // on-chain Pact function is C_RotateKadena (kadena-ledger payment key).
-    expect(code).toContain(".TS01-C1.DALOS|C_RotateKadena ");
+    // on-chain Pact function is C_RotateStoa (kadena-ledger payment key).
+    expect(code).toContain(".TS01-C1.DALOS|C_RotateStoa ");
   });
 
   it("argument ORDER is patron, account, newPaymentKey", () => {

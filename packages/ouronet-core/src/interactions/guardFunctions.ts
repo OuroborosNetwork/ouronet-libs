@@ -35,7 +35,7 @@ export interface RotateGuardParams {
 
 /**
  * Query RotateGuard info object from the chain.
- * (ouronet-ns.DALOS-INFO.DALOS-INFO|URC_RotateGuard <patron> <account>)
+ * (ouronet-ns.INFO-ONE.INFO_DALOS|RotateGuard <patron> <account>)
  */
 export async function getRotateGuardInfo(
   patron: string,

@@ -205,7 +205,7 @@ export async function getSparksBalance(account: string): Promise<any | null> {
   }
 }
 
-// (ouronet-ns.TS01-C2.SWP|C_Firestarter ouro-account:string)
+// (ouronet-ns.TS01-C3.SWP|C_Firestarter ouro-account:string)
 export async function firestarter(
   ouroAccount: IOuroAccountKeypair, // Ouro account that will receive the IGNIS
   kadenaAccount: IKadenaKeypair, // The kadena account that will transfer KDA

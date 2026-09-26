@@ -21,14 +21,14 @@ import { getLogger } from "@stoachain/stoa-core/observability";
 
 /**
  * Query RotateKadena info object from the chain.
- * (ouronet-ns.INFO-ZERO.DALOS-INFO|URC_RotateKadena <patron> <account>)
+ * (ouronet-ns.INFO-ONE.INFO_DALOS|RotateStoa <patron> <account>)
  */
 export async function getRotateKadenaInfo(
   patron: string,
   account: string
 ): Promise<any | null> {
   try {
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ZERO.DALOS-INFO|URC_RotateKadena "${patron}" "${account}")`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_DALOS|RotateStoa "${patron}" "${account}")`;
     const response = await pactRead(pactCode, { tier: "T3" });
 
     if (response?.result?.status === "success") {
@@ -43,7 +43,7 @@ export async function getRotateKadenaInfo(
 
 /**
  * Rotate Payment Key (Kadena Ledger) for an Ouronet account.
- * (ouronet-ns.TS01-C1.DALOS|C_RotateKadena patron account newPaymentKey)
+ * (ouronet-ns.TS01-C1.DALOS|C_RotateStoa patron account newPaymentKey)
  *
  * Requires two signers:
  * 1. patronKadenaKey — key from patron's guard (pays IGNIS, has GAS_PAYER cap)
@@ -76,7 +76,7 @@ export async function rotateKadenaPaymentKey(
   const buildTransaction = (gasLimitOverride?: number) => {
     let builder = Pact.builder
       .execution(
-        `(${KADENA_NAMESPACE}.TS01-C1.DALOS|C_RotateKadena "${patronAddress}" "${accountAddress}" "${newPaymentKey}")`
+        `(${KADENA_NAMESPACE}.TS01-C1.DALOS|C_RotateStoa "${patronAddress}" "${accountAddress}" "${newPaymentKey}")`
       );
 
     // Add keyset data for patron guard

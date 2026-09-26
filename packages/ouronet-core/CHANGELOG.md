@@ -57,6 +57,26 @@ it and priced the swap at 77 IGNIS.
 
 `SmartSwapExecutionParams` gains an optional `onProgress`.
 
+### Eight stale contract names, fixed at source
+
+Found by teaching `check-chain-symbols.py` about the rename shim it did not model. Each was
+verified on mainnet for RESOLUTION **and** result shape before being changed — the shim's own
+rule, and the reason none of these is inferred from a naming pattern:
+
+| was | now | why |
+|---|---|---|
+| `U\|CT.UR\|KDA-PID` | `U\|CT.UR_STOA-PID\|Price` | the Kadena→Stoa sweep. Returns 0.1, the documented $0.10 peg |
+| `OUROBOROS.URC_Compress` | `URCv_Compress` | `v` prefix: the enforce is intrinsic. Still `[{decimal}]`, so the caller's `(at 0 …).decimal` is unchanged |
+| `OUROBOROS.URC_Sublimate` | `URCv_Sublimate` | as above; returns the ignis amount directly |
+| `SWP.URD_OwnedSwapPairs` | `URH_OwnedSwapPairs` | heavy-read prefix moved `URD_`→`URH_` |
+| `INFO-ZERO.DALOS-INFO\|URC_RotateKadena` | `INFO-ONE.INFO_DALOS\|RotateStoa` | INFO-ZERO defines one function; the previews moved |
+| `DALOS-INFO.DALOS-INFO\|URC_RotateGuard` | `INFO-ONE.INFO_DALOS\|RotateGuard` | `DALOS-INFO` is not a deployed module at all |
+| `TS01-C1.DALOS\|C_RotateKadena` | `C_RotateStoa` | same arity |
+| `TS01-C2.SWP\|C_Firestarter` | `TS01-C3.SWP\|C_Firestarter` | right function, wrong Talos module |
+
+A call to any of these failed as a **resolution** error, which `try` cannot catch and which
+callers render as a default — so they looked like missing data, not broken calls.
+
 ### Also in this release
 
 `feat: unify Chainweaver/EckoWallet, add the Stoa Dalos ("stoic") seed path` — landed

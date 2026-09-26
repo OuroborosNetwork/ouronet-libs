@@ -10,7 +10,13 @@ import { pactRead } from "@stoachain/stoa-core/reads";
 import { getLogger } from "@stoachain/stoa-core/observability";
 
 /**
- * Read the live STOA/USD price from the on-chain KDA-PID oracle.
+ * Read the live STOA/USD price from the on-chain STOA-PID oracle.
+ *
+ * RENAMED 2026-09-26. The reader was `U|CT.UR|KDA-PID` and is now
+ * `U|CT.UR_STOA-PID|Price` -- part of the contracts' Kadena->Stoa sweep, the same one that
+ * moved `UR_AccountKadena` to `UR_AccountStoa`. The old name is not on chain, so the call was
+ * failing as a RESOLUTION error, which `try` cannot catch and which surfaced as a null price.
+ * Verified: the new reader returns 0.1, the documented $0.10 STOA peg.
  *
  * Returns `null` when the oracle is unreachable, the chain call returns a
  * non-success status, or the decoded value is not a finite number. Callers
@@ -19,7 +25,7 @@ import { getLogger } from "@stoachain/stoa-core/observability";
  */
 export async function getStoaPriceUSD(options?: { skipTempWatcher?: boolean }): Promise<number | null> {
   try {
-    const pactCode = `(${KADENA_NAMESPACE}.U|CT.UR|KDA-PID)`;
+    const pactCode = `(${KADENA_NAMESPACE}.U|CT.UR_STOA-PID|Price)`;
     const response = await pactRead(pactCode, { tier: "T6", skipTempWatcher: options?.skipTempWatcher });
     if (response?.result?.status === "success") {
       const value = Number(mayComeWithDeimal((response.result as any).data));

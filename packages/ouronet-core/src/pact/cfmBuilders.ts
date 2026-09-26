@@ -1053,7 +1053,7 @@ export function buildRotateGuardPactCode(p: {
  * Rotate the Kadena Ledger payment key (= "payment key") of an Ouronet
  * account.
  *
- *   (ouronet-ns.TS01-C1.DALOS|C_RotateKadena <patron> <account> <new-payment-key>)
+ *   (ouronet-ns.TS01-C1.DALOS|C_RotateStoa <patron> <account> <new-payment-key>)
  *
  * Why "RotateKadena" not "RotatePaymentKey": the on-chain Pact function is
  * `C_RotateKadena` — the kadena-ledger payment key is what the on-chain
@@ -1073,7 +1073,7 @@ export function buildRotateKadenaPactCode(p: {
   account:       string;
   newPaymentKey: string;
 }): string {
-  return `(${KADENA_NAMESPACE}.TS01-C1.DALOS|C_RotateKadena "${p.patron}" "${p.account}" "${p.newPaymentKey}")`;
+  return `(${KADENA_NAMESPACE}.TS01-C1.DALOS|C_RotateStoa "${p.patron}" "${p.account}" "${p.newPaymentKey}")`;
 }
 
 /**

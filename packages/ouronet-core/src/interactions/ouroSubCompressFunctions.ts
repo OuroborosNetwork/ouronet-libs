@@ -183,14 +183,14 @@ export async function compressIgnisToOuro(
 }
 
 // Get IGNIS generation preview for sublimation
-// (namespace.OUROBOROS.URC_Sublimate ouro-amount)
+// (namespace.OUROBOROS.URCv_Sublimate ouro-amount)
 export async function getSublimatPreview(
   ouroAmount: string
 ): Promise<{ ignis: number; fee: number } | null> {
   try {
     const decimalAmount = formatDecimalForPact(ouroAmount);
 
-    const response = await pactRead(`(${KADENA_NAMESPACE}.OUROBOROS.URC_Sublimate (at 0 (${KADENA_NAMESPACE}.U|ATS.UC_PromilleSplit 10.0 ${decimalAmount} 24)))`, { tier: "T2" });
+    const response = await pactRead(`(${KADENA_NAMESPACE}.OUROBOROS.URCv_Sublimate (at 0 (${KADENA_NAMESPACE}.U|ATS.UC_PromilleSplit 10.0 ${decimalAmount} 24)))`, { tier: "T2" });
 
     if (!response || !response.result || response.result.status === "failure") {
       return null;
@@ -207,15 +207,19 @@ export async function getSublimatPreview(
   }
 }
 
+// RENAMED 2026-09-26: OUROBOROS.URC_Compress / URC_Sublimate are URCv_ on chain -- a `v`
+// prefix, meaning the enforce is intrinsic to the computation. Neither old name resolves.
+// Shapes verified unchanged: URCv_Compress returns [{decimal}], which is why the call below
+// still reads `(at 0 …)` then `.decimal`; URCv_Sublimate returns the ignis amount directly.
 // getCompressPreview
-// (at 0 (ouronet-ns.OUROBOROS.URC_Compress ignis-amount))
+// (at 0 (ouronet-ns.OUROBOROS.URCv_Compress ignis-amount))
 export async function getCompressPreview(
   ignisAmount: string
 ): Promise<{ ouro: number; fee: number } | null> {
   try {
     const decimalAmount = formatDecimalForPact(ignisAmount);
 
-    const response = await pactRead(`(at 0 (${KADENA_NAMESPACE}.OUROBOROS.URC_Compress ${decimalAmount}))`, { tier: "T2" });
+    const response = await pactRead(`(at 0 (${KADENA_NAMESPACE}.OUROBOROS.URCv_Compress ${decimalAmount}))`, { tier: "T2" });
 
     if (!response || !response.result || response.result.status === "failure") {
       return null;

@@ -56,7 +56,7 @@ export async function getLPEntries(
  */
 export async function getOwnedSwapPairs(account: string): Promise<string[]> {
   try {
-    const response = await pactRead(`(${KADENA_NAMESPACE}.SWP.URD_OwnedSwapPairs "${account}")`, { tier: "T5" });
+    const response = await pactRead(`(${KADENA_NAMESPACE}.SWP.URH_OwnedSwapPairs "${account}")`, { tier: "T5" });
 
     if (!response?.result || response.result.status === "failure") return [];
 
