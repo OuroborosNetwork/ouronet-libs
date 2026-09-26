@@ -4,6 +4,27 @@ All notable changes to `@ouronet/ouronet-core`.
 
 This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3.3.8. v4.0.0 split it into a two-package npm workspace under `StoaChain/stoa-js` — chain-generic infrastructure moved out into [`@stoachain/stoa-core`](https://www.npmjs.com/package/@stoachain/stoa-core), this package retained the Ouronet-specific business logic. The `4.0.0` heading below is the first release after the split.
 
+## 5.2.0 — 2026-09-26
+
+### `BundleProgress` now reports the gas its reads consumed
+
+`gas` (this step) and `gasTotal` (running sum) on every progress event, so a discovery UI can
+show what the off-chain search actually cost.
+
+**This is NOT Ignis.** Ignis is Ouronet's virtual gas, collected by Talos after a `C_`. A read is
+not a transaction, collects none, and costs the user nothing. What is reported here is the Stoa
+gas meter for a SIMULATED execution, billed to nobody — the same unit the real swap is measured
+in, which is precisely what makes it worth surfacing: it is the work the bundle moves OFF the
+paid transaction. Self-searching `CC_SmartSwap` is 7,145,298 gas against a ~2,000,000 ceiling;
+the bundle path is 397,043 on chain plus this, and this part is free.
+
+Metered even on a FAILED read — the node still did the work, and skipping it would make the
+total drift below the truth exactly when something is going wrong. The meter is threaded through
+one build's reads rather than held at module scope, so two concurrent builds cannot pollute each
+other's figure.
+
+Both fields are optional and every existing `onProgress` consumer keeps working untouched.
+
 ## 5.1.0 — 2026-09-26
 
 ### SmartSwap: discovery and submission are now separable
