@@ -168,8 +168,13 @@ comparing each builder against itself rather than against the chain. One carried
 
 ### New: `smartSwapBundle`
 
-`SWP|C_SmartSwap…` takes its route as an argument and both executors here were omitting it.
-Pact does not reject a short call — it partially applies and yields a closure.
+`SWP|C_SmartSwap…` takes its route as an argument and both executors here were omitting it —
+a five-argument call to a six-parameter function. Measured on mainnet 2026-09-26, since the
+first draft of this entry overstated it: at TOP LEVEL, where an executor puts it, Pact rejects
+the short call loudly (`Evaluation did not reduce to a value`), so 4.6.0 does not silently
+no-op — it breaks the swap outright. The silent partial application is real but needs a
+discarded binding (`(let ((x (f "a" "b"))) "z")` succeeds and does nothing), which an executor
+does not produce.
 
 The bundle is not an optimisation. Measured on the worst case (6 hops, ~102 active pools):
 `CC_SmartSwap…` self-searching is **7,145,298 gas, 3.57x over the ~2,000,000 ceiling**;
@@ -181,6 +186,12 @@ bundle built by it was fed to `INFO_SWP|SmartSwapNoSlippageBundle` on mainnet, w
 it and priced the swap at 77 IGNIS.
 
 `SmartSwapExecutionParams` gains an optional `onProgress`.
+
+The cache is read through `URC_ReadPathCacheFresh`, not `URC_ReadPathCache`. #65bL added a
+global topology-version, and the plain reader returns a STALE row as a hit — which the builder
+would submit with `is-new: false`, so `XI_RegisterBundlePaths` skips it and the outdated entry
+is never refreshed. The Fresh reader collapses stale to the same `[BAR]` miss an absent row
+gives, so the path is re-traced and re-registered.
 
 ### Eight stale contract names, fixed at source
 

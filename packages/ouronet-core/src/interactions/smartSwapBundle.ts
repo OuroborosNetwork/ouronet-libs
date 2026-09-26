@@ -80,7 +80,7 @@ export function pathExists(p: { nodes?: string[] } | null): boolean {
 /**
  * Resolve `from -> to`, cache first.
  *
- * The cache is consulted with `URC_ReadPathCache` and only traced on a miss, which is the
+ * The cache is consulted with `URC_ReadPathCacheFresh` and only traced on a miss, which is the
  * whole point of the shared cache: a cold lookup costs a BFS, a warm one costs a row read.
  * `is-new` records which happened, so the contract can register a genuinely new path.
  */
@@ -90,8 +90,14 @@ async function resolveCachedPath(from: string, to: string): Promise<CachedPathOr
     // honest bundle entry is the sentinel rather than a fabricated zero-hop path.
     return { nodes: [BAR], edges: [], "is-new": false };
   }
+  // ...Fresh, NOT URC_ReadPathCache. #65bL added a global topology-version, and the plain reader
+  // returns a STALE entry as a hit -- which this would then submit with `is-new: false`, so
+  // XI_RegisterBundlePaths skips it and the outdated entry is never refreshed. The Fresh reader
+  // collapses a stale row to the same [BAR] miss an absent one gives, so a stale path is
+  // re-traced and re-registered. The interface doc says as much: the plain reader is "raw
+  // registration status only -- callers wanting freshness too go through URC_ReadPathCacheFresh".
   const cached = await readObj<{ nodes: string[]; edges: string[] }>(
-    `(${NS}.SWPT.URC_ReadPathCache ${str(from)} ${str(to)})`, "T5");
+    `(${NS}.SWPT.URC_ReadPathCacheFresh ${str(from)} ${str(to)})`, "T5");
   if (pathExists(cached)) {
     return { nodes: cached!.nodes, edges: cached!.edges, "is-new": false };
   }
