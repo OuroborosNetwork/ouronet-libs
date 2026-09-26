@@ -1,3 +1,35 @@
+## 1.1.0 — 2026-09-26
+
+**Ghost values: 40 account-shaped parameters stopped rendering as `"example"`.**
+
+Surface `67c0979111eb156b` → `7e59e59d4c5b7257`. No contract changed — the module hashes are
+identical, verified by `_registrylive.py` (12 modules, 0 drifted). What moved is the ghost
+dictionary, and the surface hash moves with it because the snapshot is the whole artefact.
+
+**Why it mattered.** A consumer previewing `ATS|C_Coil` got
+`No value found in table … for key: example` — true, and useless. The ghost dictionary keyed
+account values on `patron` / `executor` / `executee` / `account` / `buyer` / `receiver`, and the
+contracts' own vocabulary is much wider: `coiler`, `curler`, `brumator`, `constricter`, `culler`,
+`fueler`, `kickstarter`, `awaker`, `hibernator`, `wrapper`, `unwrapper`, `vester`, `redeemer`,
+`transmuter`, `donor`, `owner-konto`, `redemption-payer` … Every one fell through to the generic
+string ghost.
+
+**Not guessed.** The names were matched against `_executorplan.ACCT` — the curated account-vs-
+entity vocabulary the patron/executor canon sweep already maintains in the Pact repo, for exactly
+this distinction. Reusing it means there is one list, not two that drift.
+
+**227 slots are still generic, and deliberately so.** They are entity ids — `fvt-id`, `pool-id`,
+`score-id`, `collectable-id` — where a plausible-looking fake would produce a confident number for
+an entity nobody owns. An obviously-fake `"example"` is the better failure.
+
+### `params` on every spec
+
+Consumers merging real values into a preview need the **preview's** parameter names, and
+**410 of 423 previews take a different parameter list from their entrypoint** —
+`INFO_DPTF|Transfer` is `(patron id sender receiver transfer-amount)` against `C_Transfer`'s
+`(patron executor executee id transfer-amount method)`. Merging on the execution signature would
+put an account in an `id` slot on 97% of calls, silently, with a cost beside it.
+
 # @ouronet/talos-registry
 
 ## 1.0.0

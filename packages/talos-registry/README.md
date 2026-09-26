@@ -17,7 +17,7 @@ buildCall("TS01-C1.DPTF|C_Transfer", {
 Note `1` became `1.0`. Pact's decimal lexer rejects a bare integer in a decimal slot, and that
 is the least interesting thing this package stops you getting wrong.
 
-**This build:** 423 entrypoints, 428 previews, surface `67c0979111eb156b`, generated against mainnet.
+**This build:** 423 entrypoints, 428 previews, surface `7e59e59d4c5b7257`, generated against mainnet.
 Every figure in this file is asserted by `tests/readme.test.ts` against the bundled snapshot, so
 a stale number fails the suite rather than misleading a reader.
 
