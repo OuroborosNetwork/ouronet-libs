@@ -92,20 +92,20 @@ describe("v4.2.0 coverage — kpayFunctions.getKpayAcquireCapabilities", () => {
   it("returns capability strings array verbatim on success (isNative=true)", async () => {
     const stub = ['<(coin.TRANSFER "k:from" "c:to" 46.298)>'];
     setPactReader(successReader(stub));
-    const out = await getKpayAcquireCapabilities("k:buyer", 100, true);
+    const out = await getKpayAcquireCapabilities("k:buyer", 100, true, 1.0);
     expect(out).toEqual(stub);
   });
 
   it("returns capability strings array verbatim on success (isNative=false, WSTOA)", async () => {
     const stub = ['<(ouronet-ns.WSTOA.TRANSFER "k:from" "c:to" 100.0)>'];
     setPactReader(successReader(stub));
-    const out = await getKpayAcquireCapabilities("k:buyer", 100, false);
+    const out = await getKpayAcquireCapabilities("k:buyer", 100, false, 1.0);
     expect(out).toEqual(stub);
   });
 
   it("returns null on failure-status", async () => {
     setPactReader(failureStatusReader);
-    const out = await getKpayAcquireCapabilities("k:buyer", 100, true);
+    const out = await getKpayAcquireCapabilities("k:buyer", 100, true, 1.0);
     expect(out).toBeNull();
   });
 
@@ -113,7 +113,7 @@ describe("v4.2.0 coverage — kpayFunctions.getKpayAcquireCapabilities", () => {
     setPactReader(throwingReader);
     const spyLogger: Logger = { warn: vi.fn(), error: vi.fn(), info: vi.fn() };
     setLogger(spyLogger);
-    const out = await getKpayAcquireCapabilities("k:buyer", 100, true);
+    const out = await getKpayAcquireCapabilities("k:buyer", 100, true, 1.0);
     expect(out).toBeNull();
     expect(spyLogger.error).toHaveBeenCalledWith("Error getting KPay acquire capabilities:", expect.any(Error));
   });
@@ -121,6 +121,13 @@ describe("v4.2.0 coverage — kpayFunctions.getKpayAcquireCapabilities", () => {
 
 // ══ kpayBuy — LC-7-D execute-class with pre-call validation smoke ══════════
 describe("v4.2.0 coverage — kpayFunctions.kpayBuy (execute-class)", () => {
+  // UPDATED 2026-09-26. This "lock" pinned a SEVEN-parameter signature, and seven parameters
+  // could not build a valid transaction: the execution string named TS02-DPAD.KPAY|C_BuyKpay,
+  // a module/function pair that does not exist, and omitted `max-cost` -- so the deployed
+  // TS02-CPAD.KPAY|C_BuyStoicPay would have partially applied to a closure rather than erroring.
+  // A signature lock asserts that the shape has not drifted; it cannot notice that the shape was
+  // never right. `slippagePercent` is the eighth, and it is required rather than defaulted
+  // because the same number bounds BOTH the capability pad and max-cost.
   it("locks the public-API parameter list and return type", () => {
     expectTypeOf(kpayBuy).parameters.toEqualTypeOf<
       [
@@ -130,7 +137,8 @@ describe("v4.2.0 coverage — kpayFunctions.kpayBuy (execute-class)", () => {
         boolean,
         IKadenaKeypair,
         IKadenaKeypair,
-        { keys: string[]; pred: "keys-all" | "keys-any" | "keys-2" }
+        { keys: string[]; pred: "keys-all" | "keys-any" | "keys-2" },
+        number
       ]
     >();
     expectTypeOf(kpayBuy).returns.toMatchTypeOf<Promise<unknown>>();
@@ -142,7 +150,18 @@ describe("v4.2.0 coverage — kpayFunctions.kpayBuy (execute-class)", () => {
     const kadena: IKadenaKeypair = { publicKey: "k1", privateKey: "s1" } as IKadenaKeypair;
     const guard: IKadenaKeypair = { publicKey: "k2", privateKey: "s2" } as IKadenaKeypair;
     await expect(
-      kpayBuy(patron, "k:buyer", 100, true, kadena, guard, { keys: ["pk"], pred: "keys-all" }),
+      kpayBuy(patron, "k:buyer", 100, true, kadena, guard, { keys: ["pk"], pred: "keys-all" }, 1.0),
     ).rejects.toThrow(/Failed to retrieve capabilities for KPAY purchase/);
+  });
+
+  it("refuses an out-of-range slippage before reaching the chain", async () => {
+    const patron: IOuroAccountKeypair = { address: "k:patron", publicKey: "pk", privateKey: "sk" };
+    const kadena: IKadenaKeypair = { publicKey: "k1", privateKey: "s1" } as IKadenaKeypair;
+    const guard: IKadenaKeypair = { publicKey: "k2", privateKey: "s2" } as IKadenaKeypair;
+    const ks = { keys: ["pk"], pred: "keys-all" as const };
+    for (const bad of [-1, 50.1, NaN]) {
+      await expect(kpayBuy(patron, "k:buyer", 100, true, kadena, guard, ks, bad))
+        .rejects.toThrow(/Slippage must be between 0 and 50 percent/);
+    }
   });
 });

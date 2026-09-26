@@ -54,7 +54,9 @@ export async function getKpayAmountCosts(
   try {
     const integerAmount = Math.floor(amount);
     
-    const response = await pactRead(`(${KADENA_NAMESPACE}.DEMIPAD-KPAY.URC_KpayAmountCosts ${integerAmount} ${futureSeconds})`, { tier: "T6" });
+    // `futureSeconds` is the contract's `offset` -- "the time with a future offset in seconds",
+    // per UR_KpayPID's own @doc. Same arity, same order; only the module name was wrong.
+    const response = await pactRead(`(${KADENA_NAMESPACE}.DEMIPAD-STOICPAY.URC_KpayAmountCosts ${integerAmount} ${futureSeconds})`, { tier: "T6" });
 
     if (!response || !response.result || response.result.status === "failure") {
       return null;
@@ -77,12 +79,20 @@ export async function getKpayAmountCosts(
 export async function getKpayAcquireCapabilities(
   buyer: string,
   amount: number,
-  isNative: boolean
+  isNative: boolean,
+  slippagePercent: number
 ): Promise<string[] | null> {
+  // SLIPPAGE IS REQUIRED, not defaulted. The same number has to drive this capability pad AND
+  // the `max-cost` passed to C_BuyStoicPay, and if they disagree the chain refuses the buy after
+  // the user has signed. A default here would let one call site pick 1% and the other 2% with
+  // nothing to reconcile them -- the exact shape of the sparkBuy bug this mirrors.
+  if (!(slippagePercent >= 0 && slippagePercent <= 50)) {
+    throw new Error(`Slippage must be between 0 and 50 percent, got ${slippagePercent}`);
+  }
   try {
     const integerAmount = Math.floor(amount);
-    
-    const response = await pactRead(`(${KADENA_NAMESPACE}.DEMIPAD-KPAY.URC_Acquire "${buyer}" ${integerAmount} ${isNative})`, { tier: "T5" });
+
+    const response = await pactRead(`(${KADENA_NAMESPACE}.DEMIPAD-STOICPAY.URC_Acquire "${buyer}" ${integerAmount} ${isNative} ${slippagePercent.toFixed(12)})`, { tier: "T5" });
 
     if (!response || !response.result || response.result.status === "failure") {
       return null;
@@ -152,23 +162,48 @@ export async function kpayBuy(
   isNative: boolean,
   kadenaAccount: IKadenaKeypair,
   guardAccount: IKadenaKeypair,
-  guardKeyset: { keys: string[]; pred: "keys-all" | "keys-any" | "keys-2" }
+  guardKeyset: { keys: string[]; pred: "keys-all" | "keys-any" | "keys-2" },
+  slippagePercent: number
 ): Promise<any> {
   const keysetName = `ks`;
-  
+
+  if (!(slippagePercent >= 0 && slippagePercent <= 50)) {
+    throw new Error(`Slippage must be between 0 and 50 percent, got ${slippagePercent}`);
+  }
+
   // 1. Convert to integer
   const integerAmount = Math.floor(kpayAmount);
-  
-  // 2. Get required capabilities from blockchain
+
+  // 2. Get required capabilities from blockchain -- with the SAME slippage that will bound the
+  //    payment, so the pad the user signs and the ceiling the contract enforces cannot diverge.
   const capabilitiesStrings = await getKpayAcquireCapabilities(
     buyerAccount,
     integerAmount,
-    isNative
+    isNative,
+    slippagePercent
   );
   
   if (!capabilitiesStrings || capabilitiesStrings.length === 0) {
     throw new Error("Failed to retrieve capabilities for KPAY purchase");
   }
+
+  // 2b. THE CEILING, AT THE OFFSET THE CONTRACT ITSELF USES.
+  //
+  // `max-cost` is the buyer's slippage ceiling IN DOLLARS -- C_BuyStoicPay's own @doc says so --
+  // and the contract derives the price it compares against with `URC_KpayAmountCosts amount 0.0`.
+  // So the ceiling must be built from offset 0 too. getKpayAmountCosts defaults to 900 seconds
+  // (a fifteen-minute-ahead projection, right for a quote shown to a user) and using THAT here
+  // would compare a future price against a present one: the buy would be refused after signing,
+  // for a reason no error message mentions.
+  const costsNow = await getKpayAmountCosts(integerAmount, 0.0);
+  if (!costsNow) {
+    throw new Error("Failed to retrieve KPAY price for the slippage ceiling");
+  }
+  const pidNow = parseFloat(String((costsNow as any).pid?.decimal ?? (costsNow as any).pid));
+  if (!Number.isFinite(pidNow)) {
+    throw new Error(`KPAY price is not numeric: ${JSON.stringify(costsNow)}`);
+  }
+  const maxCost = pidNow * (1 + slippagePercent / 100);
   
   // 3. Parse capabilities
   const parsedCapabilities: Array<{ name: string; args: any[] }> = [];
@@ -188,7 +223,7 @@ export async function kpayBuy(
   // 4. Build transaction
   const buildTransaction = (gasLimitOverride?: number) => {
     return Pact.builder
-      .execution(`(${KADENA_NAMESPACE}.TS02-DPAD.KPAY|C_BuyKpay "${patronAccount.address}" "${buyerAccount}" ${integerAmount} ${isNative})`)
+      .execution(`(${KADENA_NAMESPACE}.TS02-CPAD.KPAY|C_BuyStoicPay "${patronAccount.address}" "${buyerAccount}" ${integerAmount} ${isNative} ${maxCost.toFixed(12)})`)
       .addData(keysetName, {
         keys: guardKeyset.keys,
         pred: guardKeyset.pred,

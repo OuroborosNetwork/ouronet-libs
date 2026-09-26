@@ -9,6 +9,46 @@ This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3
 **MAJOR — six transaction builders gained a required `executor`. They were emitting Pact the
 deployed contracts reject, and OuronetUI would not compile.**
 
+### Breaking: the KPay/StoicPay path — wrong module, wrong function, missing ceiling
+
+Three of the four kpay symbols were repairable, and the repair was not a rename in any of them.
+
+| what it called | what is deployed |
+|---|---|
+| `DEMIPAD-KPAY.URC_KpayAmountCosts(amount, offset)` | `DEMIPAD-STOICPAY.…` — module only |
+| `DEMIPAD-KPAY.URC_Acquire(buyer, amount, isNative)` | `DEMIPAD-STOICPAY.…(…, slippage)` — **+1 arg** |
+| `TS02-DPAD.KPAY\|C_BuyKpay(patron, buyer, amount, isNative)` | `TS02-CPAD.KPAY\|C_BuyStoicPay(…, max-cost)` — **wrong module, wrong function, +1 arg** |
+
+`slippagePercent` is now **required** on `getKpayAcquireCapabilities` and `kpayBuy`, not defaulted.
+The same number bounds two things that must agree — the capability pad the user signs and the
+`max-cost` the contract enforces — and a default lets one call site pick 1% and another 2% with
+nothing to reconcile them. The chain then refuses the buy *after* the signature.
+
+**`max-cost` is read at offset 0, deliberately.** `C_BuyStoicPay`'s own `@doc` says it is "the
+buyer's slippage ceiling in dollars", and the contract derives the price it compares against with
+`URC_KpayAmountCosts amount 0.0`. `getKpayAmountCosts` defaults to 900 seconds — a
+fifteen-minute-ahead projection, right for a quote shown to a user and wrong for this. Using it
+would compare a future price to a present one and lose the buy for a reason no error names.
+
+`UR_Kpay` is **not** fixed and cannot be renamed into correctness: the deployed module has no
+per-account data object at all, only `UR_KpayID` / `UR_KpayLeft` / `UR_KpayPID` / `UR_GetPeriod`,
+`URv_PeriodAllocation` and `URC_GetMaxBuy`. `KPaySale.tsx` reads **seventeen** fields off the old
+object, five of them pre-formatted display strings. That needs an AppReads reader authored.
+
+Separately: **the StoicPay sale is not initialised on chain.** Every one of these now resolves and
+fails with *"No value found in table … KPAY|T|Properties for key: StoicPayV3"*. The names are
+right; the sale has no row yet. So this is a correctness fix, not a working page.
+
+A test here was `it("locks the public-API parameter list and return type")` for a **seven**-
+parameter `kpayBuy`. Seven parameters could not build a valid transaction. A signature lock
+asserts a shape has not drifted; it cannot notice the shape was never right. Fifth instance this
+week of a test defending the bug it was written beside.
+
+One stub was also fixed rather than worked around: the gas-price suite answered every `URC_` read
+with `["1.0","1.0"]`, which made the new `max-cost` derivation throw *"price is not numeric"* —
+correctly, since a two-element array is not a `Costs`. **A stub that answers every read with the
+same shape will eventually answer one that cares.**
+
 ### Breaking: `getHibernateFee` throws instead of guessing; four phantom readers gone
 
 `getHibernateFee` called `DPL-UR.URC_0012_HibernateFee`, a name that has **never existed in any

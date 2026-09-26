@@ -129,6 +129,13 @@ const reader: PactReader = (pactCode: string) => {
   } else if (pactCode.includes("UR_WrappedStoaID")) {
     data = "WSTOA";
   }
+  else if (pactCode.includes("URC_KpayAmountCosts")) {
+    // SHAPED LIKE THE CONTRACT, not like the catch-all below. kpayBuy reads this to build its
+    // `max-cost` ceiling, and the generic ["1.0","1.0"] made it throw "price is not numeric" --
+    // correctly, because a two-element array is not a Costs object. A stub that answers every
+    // read with the same shape will eventually answer one that cares.
+    data = { pid: { decimal: "12.5" }, wkda: { decimal: "125.0" } };
+  }
   else if (pactCode.includes("Slippage") || pactCode.includes("URC_")) data = ["1.0", "1.0"];
   return Promise.resolve({ result: { status: "success", data } } as any);
 };
@@ -188,7 +195,7 @@ const EXECUTORS: ReadonlyArray<[string, () => Promise<unknown>]> = [
   ["pensionFunctions.brumateWkdaToPkda", () =>
     brumateWkdaToPkda(ouro, kadena, guard, "1.0", 30)],
   ["kpayFunctions.kpayBuy", () =>
-    kpayBuy(ouro, "Ѻ.BUYER", 2, true, kadena, guard, keyset)],
+    kpayBuy(ouro, "Ѻ.BUYER", 2, true, kadena, guard, keyset, 1.0)],
   ["ouroWrapFunctions.wrapKadena", () =>
     wrapKadena(ouro, "Ѻ.WRAPPER", kadena, guard, "1.0")],
   // Already fixed in 4.5.1 — re-asserted here because 4.6.0 swapped their
