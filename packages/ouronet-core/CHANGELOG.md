@@ -4,6 +4,32 @@ All notable changes to `@ouronet/ouronet-core`.
 
 This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3.3.8. v4.0.0 split it into a two-package npm workspace under `StoaChain/stoa-js` — chain-generic infrastructure moved out into [`@stoachain/stoa-core`](https://www.npmjs.com/package/@stoachain/stoa-core), this package retained the Ouronet-specific business logic. The `4.0.0` heading below is the first release after the split.
 
+## 5.1.0 — 2026-09-26
+
+### SmartSwap: discovery and submission are now separable
+
+`SmartSwapExecutionParams` gains `bundle?` and `slippageBounds?`. Supply them and the executor
+skips its own discovery and its own bounds fetch.
+
+This exists because a two-phase UI cannot be built without it. The IGNIS cost of a smart swap is
+ROUTE-DEPENDENT — `INFO_SWP|SmartSwap*Bundle` prices the bundle it is given, so a 6-hop route
+costs more than a 1-hop one — which means no honest fee can be shown until discovery has
+finished. A client that wants the user to see the route and the price before signing has to hold
+the bundle between the two, and until now the executor built one and submitted in the same call.
+
+`slippageBounds?` closes a real gap rather than a hypothetical one: OuronetUI displayed bounds
+from its own `UDC_SpawnSmartSwapSlippageBounds` read while the executor independently re-fetched
+its own for the transaction. Two reads, two moments, no guarantee they agreed.
+
+Both remain optional and both default to the previous behaviour, so a single-shot caller is
+unaffected.
+
+Also corrects the short-call comments in both executors. They claimed Pact answers a short call
+with a closure. Measured on mainnet: at TOP LEVEL, where these put it, Pact rejects it loudly
+("Evaluation did not reduce to a value"). The silent partial application is real but needs a
+discarded binding, which an executor never emits — so 4.6.0 broke the swap outright rather than
+quietly doing nothing, a different and more findable failure than the comment described.
+
 ## 5.0.0 — 2026-09-26
 
 **MAJOR — six transaction builders gained a required `executor`. They were emitting Pact the

@@ -118,8 +118,10 @@ export async function executeSmartSwapWithSlippage(
     const amountDecimal = amountStr.includes(".") ? amountStr : `${amountStr}.0`;
     const slippage = params.slippage ?? 5;
 
-    // Fetch slippage bounds before executing
-    const slippageObj = await getSmartSwapSlippageBounds(
+    // Bounds the caller already fetched WIN, so what a UI displayed is what it submits. Without
+    // this the executor re-fetches, and the shown bounds and the sent bounds were two separate
+    // reads taken at two different moments.
+    const slippageObj = params.slippageBounds ?? await getSmartSwapSlippageBounds(
       params.inputId,
       amountDecimal,
       params.outputId,
@@ -133,10 +135,13 @@ export async function executeSmartSwapWithSlippage(
     // the ~2,000,000 ceiling. So the bundle is not an optimisation, it is what makes a
     // multi-hop swap mineable at all.
     //
-    // This call used to omit it entirely, which Pact does not reject: a short call PARTIALLY
-    // APPLIES and yields a closure, so the transaction would have been built around a value
-    // that is not a swap.
-    const bundle = await buildSmartSwapBundle({
+    // This call used to omit it entirely -- a 5-argument call to a 6-parameter function. At top
+    // level Pact rejects that loudly ("Evaluation did not reduce to a value"), so it BROKE the
+    // swap rather than silently no-opping it; the silent partial application needs a discarded
+    // binding, which this never emits.
+    //
+    // A caller that already discovered a bundle passes it in and discovery is skipped.
+    const bundle = params.bundle ?? await buildSmartSwapBundle({
       inputId: params.inputId,
       outputId: params.outputId,
       inputAmount: Number(amountDecimal),
@@ -217,9 +222,12 @@ export async function executeSmartSwapNoSlippage(
 
     // The route bundle -- same reason as the slippage variant: `CC_SmartSwapNoSlippage`, the
     // self-searching twin, measures 7,145,298 gas on the worst case against a ~2,000,000
-    // ceiling. This entrypoint takes the route instead, and omitting it does not error --
-    // Pact partially applies and yields a closure.
-    const bundle = await buildSmartSwapBundle({
+    // ceiling. This entrypoint takes the route instead. Omitting it DOES error at top level
+    // ("Evaluation did not reduce to a value") -- the silent partial application needs a
+    // discarded binding, which this never emits.
+    //
+    // A caller that already discovered a bundle passes it in and discovery is skipped.
+    const bundle = params.bundle ?? await buildSmartSwapBundle({
       inputId: params.inputId,
       outputId: params.outputId,
       inputAmount: Number(amountDecimal),

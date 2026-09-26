@@ -1,3 +1,4 @@
+import type { SmartSwapPathBundle } from "./smartSwapBundle";
 /**
  * dexTypes.ts
  * Cross-cutting interface and type-alias definitions for the DEX entity files.
@@ -195,6 +196,20 @@ export interface SmartSwapExecutionParams {
    * rather than a fake spinner. Only the submission costs gas.
    */
   readonly onProgress?: (p: { stage: string; detail: string; fraction: number }) => void;
+  /**
+   * A bundle ALREADY built by `buildSmartSwapBundle`. Supply it to split discovery from
+   * submission -- a client that wants to show the user the route and the fee before they sign
+   * has to, because both are only knowable once the bundle exists (the cost is route-dependent:
+   * `INFO_SWP|SmartSwap*Bundle` prices the bundle itself). Omit it and the executor discovers
+   * one itself, which is the single-shot behaviour.
+   */
+  readonly bundle?: SmartSwapPathBundle;
+  /**
+   * Slippage bounds ALREADY fetched. Same reason: without this the executor re-fetches, so what
+   * a UI displayed and what it submitted came from two separate reads taken at two different
+   * moments, and could legitimately differ. Ignored unless `slippage` is in play.
+   */
+  readonly slippageBounds?: SmartSwapSlippageBounds;
 }
 
 /** Response shape from URC_0008b_TrueFungibleLPEntry */
