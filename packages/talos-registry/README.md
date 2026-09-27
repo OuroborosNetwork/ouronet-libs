@@ -17,7 +17,7 @@ buildCall("TS01-C1.DPTF|C_Transfer", {
 Note `1` became `1.0`. Pact's decimal lexer rejects a bare integer in a decimal slot, and that
 is the least interesting thing this package stops you getting wrong.
 
-**This build:** 423 entrypoints, 428 previews, surface `7c2b70c6118d6db2`, generated against mainnet.
+**This build:** 423 entrypoints, 428 previews, surface `9091592ba15520f4`, generated against mainnet.
 Every figure in this file is asserted by `tests/readme.test.ts` against the bundled snapshot, so
 a stale number fails the suite rather than misleading a reader.
 
@@ -166,3 +166,33 @@ four-segment pipe-joined string and an account is a glyph string, not a `k:` add
 **They are not submittable.** The accounts are not yours to sign for, and an amount of `1.0` is
 a placeholder. A preflight-fed parameter is `null` with a note naming the read — the registry
 will not invent a value it has just told you cannot be constructed.
+
+### Where a ghost may be used — `ghost.use`
+
+A ghost is not equally safe on every surface, and a single value cannot say so. Entries whose
+usage is **restricted** carry a `use` block, keyed by parameter name:
+
+```jsonc
+"ghost": {
+  "args": { "new-guard": { "readKeyset": "ks" } },
+  "use":  { "new-guard": { "zbom": false, "display": "(read-keyset \"ks\")" } }
+}
+```
+
+| key | meaning |
+|---|---|
+| `zbom` | may this be **prefilled into an input** that can reach a signed transaction? |
+| `tooltip` | may this be **rendered** where nothing is submitted? |
+| `display` | render *this string* instead of the value |
+
+**Both flags default to `true`, and the block appears only when something is restricted** — 6 of
+423 entrypoints today, every one of them guard-taking. A `use` block on all 2,182 slots would be
+noise consumers learn to skip, and the one entry that matters would be invisible inside it.
+
+The case that forced the split is `guard`. A guard **cannot be prefilled** — nobody may hand a
+user a keyset and ask them to sign under it — so `zbom` is `false`. But a tooltip showing the
+guard slot empty teaches the wrong call shape, so `tooltip` stays `true` and `display` renders
+the Pact form the caller actually writes. That is a value which is **correct to show and wrong
+to submit**, which is exactly what one tag cannot express.
+
+**Read `use` before prefilling anything.** An absent parameter is unrestricted.
