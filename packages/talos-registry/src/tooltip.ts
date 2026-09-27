@@ -24,8 +24,8 @@
  *
  * 4. NATIVE IS NOT OURONET, and the difference is narrow. A `coin.*` call has no INFO_ preview
  *    and collects no IGNIS. Gas IS still sponsored -- claiming otherwise tells a user they are
- *    about to spend when they are not. Render native with a gold perimeter so the two are never
- *    confused, and say what is actually different rather than inventing a difference.
+ *    about to spend when they are not. The two MUST be distinguishable at a glance; HOW is the
+ *    implementation's choice. `kind` is the canon; the palette is not.
  *
  * 5. A GHOST IS NOT DATA. An unresolved argument must LOOK unresolved, and a tooltip whose
  *    arguments are placeholders must not fire the preview read at all: the answer is a foregone
@@ -64,7 +64,15 @@ export interface TooltipPreview {
 }
 
 export interface TooltipModel {
-  /** `native` renders with a gold perimeter and no cost section -- rule 4. */
+  /**
+   * Which world this call belongs to -- rule 4.
+   *
+   * A renderer MUST make the two visually distinct, because they differ in what they cost and
+   * what can be previewed. It is NOT told how: OuronetUI uses gold for native and blue for
+   * Ouronet, the Codex uses violet, and both are conformant. Mandating a palette in a package
+   * consumed by applications with their own design languages would be the kind of rule that gets
+   * ignored, and a rule that gets ignored weakens the ones that matter.
+   */
   kind: "ouronet" | "native";
   /** fully qualified execution, as it would be typed in a transaction. */
   exec: string;

@@ -95,9 +95,21 @@ header comment. The claim had been *inferred* from "this is not an Ouronet opera
 nothing about who pays the host chain — and it was wrong in the direction that matters, telling a
 user they were about to spend when they were not.
 
-**Render native with a gold perimeter.** The gold is semantic, not decorative: it means *nothing
-here prices this call*. And say what is missing rather than leaving the cost panel empty — an
-empty panel reads as "the price failed to load".
+**Make the two visually distinct — the palette is yours.** The distinction is mandatory because
+the two differ in what they cost and what can be previewed; the specific colour is presentation,
+and this package does not get a vote on your design language. A rule that mandates a palette in
+someone else's application is a rule that gets ignored, and an ignored rule weakens the ones that
+matter.
+
+In practice:
+
+| | native (`coin.*`) | Ouronet (`ouronet-ns.*`) |
+|---|---|---|
+| OuronetUI | gold `#ceac5f` | blue `#3b82f6` |
+| Codex | *its own* | violet |
+
+Whatever you choose, make it carry meaning rather than decoration, and **say what is missing**
+rather than leaving the cost panel empty — an empty panel reads as "the price failed to load".
 
 Suggested footer, which is what OuronetUI ships:
 
