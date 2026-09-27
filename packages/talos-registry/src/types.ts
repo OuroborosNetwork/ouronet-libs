@@ -114,11 +114,27 @@ export interface ExternalCaps {
   note: string;
 }
 
+/** Where a single ghost value may be used. Absent field = permitted. */
+export interface GhostUse {
+  /** false = MUST NOT be prefilled into an input that can reach a signed transaction. */
+  zbom?: boolean;
+  /** false = must not be rendered at all. */
+  tooltip?: boolean;
+  /** render this string instead of the value (the submittable and readable forms differ). */
+  display?: string;
+}
+
 export interface Ghost {
   /** example arguments by parameter name. `null` means "obtain from the preflight". */
   args: Record<string, unknown>;
   source: string;
   notes?: Record<string, string>;
+  /**
+   * Per-parameter surface restrictions. Present ONLY for parameters that have one -- 6 of 423
+   * entrypoints today, all guard-taking. An absent parameter is unrestricted.
+   */
+  use?: Record<string, GhostUse>;
+  useNote?: string;
   unresolved?: string[];
   unresolvedNote?: string;
   warning: string;

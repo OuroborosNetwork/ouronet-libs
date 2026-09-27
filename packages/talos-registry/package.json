@@ -1,6 +1,6 @@
 {
   "name": "@ouronet/talos-registry",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "description": "The Ouronet callable surface, generated from the deployed contracts. Supply values; never type a function name.",
   "type": "module",
   "main": "./dist/index.js",
@@ -18,7 +18,8 @@
   "files": [
     "dist",
     "README.md",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "TOOLTIP-CANON.md"
   ],
   "scripts": {
     "sync": "node scripts/sync-registry.mjs",

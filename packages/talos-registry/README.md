@@ -167,6 +167,24 @@ four-segment pipe-joined string and an account is a glyph string, not a `k:` add
 a placeholder. A preflight-fed parameter is `null` with a note naming the read — the registry
 will not invent a value it has just told you cannot be constructed.
 
+## The tooltip canon
+
+`TOOLTIP-CANON.md` and `tooltipModel()` are the shared rules for rendering a pre-ZBOM tooltip —
+what to show, in what order, and which of it may be prefilled. They are shipped as an
+implementation rather than a document because a document drifts from the code it describes:
+
+```ts
+import { tooltipModel, signatureRows } from "@ouronet/talos-registry";
+const m = tooltipModel("TS01-C1.DPTF|C_Transfer", { id: '"OURO-8Nh-JO8JO4F5"' });
+// m.slots -> EVERY execution parameter, in order, with type, value and flags
+// m.preview -> the INFO_ call with ITS OWN parameter list
+// m.kind -> "ouronet" | "native"   (native renders gold, has no cost section)
+```
+
+Six rules, each there because it was got wrong first — most recently a six-parameter transfer
+whose tooltip showed five arguments, because it was rendering the preview's list under the
+execution's heading. Read the canon before building one.
+
 ### Where a ghost may be used — `ghost.use`
 
 A ghost is not equally safe on every surface, and a single value cannot say so. Entries whose
