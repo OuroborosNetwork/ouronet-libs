@@ -7,7 +7,8 @@
  */
 import { describe, expect, it } from "vitest";
 import {
-  tooltipModel, tooltipModels, signatureRows, isNativeKey, PLACEHOLDER, NATIVE_SIGNATURES,
+  tooltipModel, tooltipModels, signatureRows, chainOf, PLACEHOLDER,
+  STOA_SIGNATURES, KADENA_SIGNATURES,
 } from "../src/tooltip.js";
 import { registry, entrypointKeys, getEntrypoint, getPreview } from "../src/registry.js";
 import { readFileSync } from "node:fs";
@@ -79,15 +80,41 @@ describe("rule 3 — types are a parallel row, not inline pairs", () => {
   });
 });
 
-describe("rule 4 — native is not Ouronet, and the difference is narrow", () => {
-  it("classifies coin.* as native and everything else as ouronet", () => {
-    expect(isNativeKey("coin.C_URV|Stake")).toBe(true);
-    expect(isNativeKey(TRANSFER)).toBe(false);
-    expect(tooltipModel("coin.C_URV|Stake").kind).toBe("native");
+describe("rule 4 — three worlds, distinguishable", () => {
+  it("classifies each key to its own chain", () => {
+    expect(chainOf("coin.C_URV|Stake")).toBe("stoa");
+    expect(chainOf("coin.transfer")).toBe("kadena");
+    expect(chainOf(TRANSFER)).toBe("ouronet");
+    expect(tooltipModel("coin.C_URV|Stake").kind).toBe("stoa");
+    expect(tooltipModel("coin.transfer").kind).toBe("kadena");
     expect(tooltipModel(TRANSFER).kind).toBe("ouronet");
   });
 
-  it("gives a native call NO preview and NO read", () => {
+  it("rule 0 — a key from no chain this model knows is UNDEFINED, not a guess", () => {
+    // Arweave and anything else non-Chainweb. `undefined` is how a caller learns to render no
+    // tooltip at all rather than an empty one.
+    expect(chainOf("arweave.transfer")).toBeUndefined();
+    expect(chainOf("NOPE.Whatever|C_X")).toBeUndefined();
+  });
+
+  it("REFUSES a key claimed by both chains rather than picking one", () => {
+    // Both chains have a `coin`. Today nothing collides -- StoaChain uses C_-style names, Kadena
+    // uses KIP-0002 kebab-case -- but if one ever does, guessing would describe a call on the
+    // WRONG CHAIN, which is the kind of wrong that looks right.
+    const dup = Object.keys(STOA_SIGNATURES).filter((k) => k in KADENA_SIGNATURES);
+    expect(dup, `these keys are declared for both chains: ${dup.join(", ")}`).toEqual([]);
+  });
+
+  it("keeps Kadena's signatures distinct from StoaChain's", () => {
+    // coin.transfer (Kadena) and coin.C_Transfer (Stoa) take the same shape but are different
+    // chains, different gas and different balances. Pinned so a merge cannot collapse them.
+    expect(Object.keys(KADENA_SIGNATURES)).toContain("coin.transfer");
+    expect(Object.keys(STOA_SIGNATURES)).toContain("coin.C_Transfer");
+    expect(KADENA_SIGNATURES["coin.transfer-crosschain"]!.map(([n]) => n))
+      .toEqual(["sender", "receiver", "receiver-guard", "target-chain", "amount"]);
+  });
+
+  it("gives an off-registry call NO preview and NO read", () => {
     // Nothing on StoaChain's `coin` contract prices a call. That is the real difference --
     // along with no IGNIS. It is NOT a difference in sponsorship: a native call IS gas-station
     // sponsored, and claiming otherwise tells a user they are about to spend when they are not.
@@ -96,13 +123,13 @@ describe("rule 4 — native is not Ouronet, and the difference is narrow", () =>
     expect(m.shouldRead).toBe(false);
   });
 
-  it("gives native accounts a KADENA shape, never an Ouronet glyph", () => {
+  it("gives off-registry accounts a k: shape, never an Ouronet glyph", () => {
     const m = tooltipModel("coin.C_UR|Transfer");
     expect(m.slots.find((s) => s.name === "sender")!.value).toMatch(/^"k:/);
   });
 
-  it("every native signature is non-empty and typed", () => {
-    for (const [k, sig] of Object.entries(NATIVE_SIGNATURES)) {
+  it("every off-registry signature is non-empty and typed", () => {
+    for (const [k, sig] of Object.entries({ ...STOA_SIGNATURES, ...KADENA_SIGNATURES })) {
       expect(sig.length, k).toBeGreaterThan(0);
       for (const [name, type] of sig) {
         expect(name, k).toBeTruthy();
@@ -111,8 +138,8 @@ describe("rule 4 — native is not Ouronet, and the difference is narrow", () =>
     }
   });
 
-  it("refuses an unknown native key by name rather than crashing", () => {
-    expect(() => tooltipModel("coin.C_Nonexistent")).toThrow(/unknown native key/i);
+  it("refuses an unknown key by name rather than crashing", () => {
+    expect(() => tooltipModel("coin.C_Nonexistent")).toThrow();
   });
 });
 
@@ -153,8 +180,8 @@ describe("rule 5 — a ghost is not data", () => {
 
 describe("multi-variant buttons", () => {
   it("keeps order and drops unknown keys rather than losing the whole tooltip", () => {
-    const ms = tooltipModels(["coin.C_UR|Transfer", "NOPE.NotReal|C_X", TRANSFER]);
-    expect(ms.map((m) => m.kind)).toEqual(["native", "ouronet"]);
+    const ms = tooltipModels(["coin.C_UR|Transfer", "arweave.send", TRANSFER, "coin.transfer"]);
+    expect(ms.map((m) => m.kind)).toEqual(["stoa", "ouronet", "kadena"]);
   });
 
   it("returns [] when nothing resolves, so a caller renders no tooltip and does not crash", () => {
@@ -219,15 +246,44 @@ describe("TOOLTIP-CANON.md quotes figures that are still true", () => {
     }
   });
 
-  it("every native key the canon relies on exists in NATIVE_SIGNATURES", () => {
-    expect(CANON).toContain("NATIVE_SIGNATURES");
-    expect(Object.keys(NATIVE_SIGNATURES).length).toBeGreaterThanOrEqual(9);
+  it("every signature table the canon relies on exists", () => {
+    expect(CANON).toContain("STOA_SIGNATURES");
+    expect(CANON).toContain("KADENA_SIGNATURES");
+    expect(Object.keys(STOA_SIGNATURES).length).toBeGreaterThanOrEqual(9);
+    expect(Object.keys(KADENA_SIGNATURES).length).toBeGreaterThanOrEqual(5);
   });
 
   it("does NOT contain the retracted sponsorship claim", () => {
     // It was wrong once and wrong about money. Pinned so it cannot come back through an edit.
-    expect(CANON).not.toMatch(/does not sponsor/i);
-    expect(CANON).not.toMatch(/pays (its|their) own STOA gas/i);
-    expect(CANON).toContain("gas station pays");
+    // NEGATIVE assertions are the load-bearing ones: they are what stops the retracted claim
+    // being re-introduced. The positive one is deliberately loose -- it checks that the canon
+    // still SAYS sponsorship happens, without pinning a phrasing that a legitimate edit would
+    // break. An earlier version pinned the exact string "gas station pays" and failed the moment
+    // a table row was reworded, which trains people to weaken the test rather than read it.
+    // Checked PARAGRAPH-WISE, not by one regex over the whole file.
+    //
+    // The first attempt tried to tell an assertion of the claim from a retraction of it with a
+    // negative lookahead, and failed on the canon's own retraction paragraph -- partly because
+    // `.` does not cross newlines. A regex clever enough to distinguish "X" from "X is false" is
+    // a regex nobody will maintain, and the temptation when it misfires is to delete it.
+    //
+    // A paragraph mentioning the claim must also mark it retracted. That is a rule a human can
+    // read off the failure message.
+    // SCOPED TO THE RETRACTED SENTENCES, not to the word "sponsored".
+    //
+    // The first pass matched any "not sponsored" and flagged a paragraph that is TRUE:
+    // `coin.transfer-crosschain` is a defpact, and a continuation's later steps genuinely are
+    // sponsored by nobody. A guard that fails on a correct statement is worse than no guard --
+    // it gets relaxed, and the relaxation is what removes the protection.
+    //
+    // The claim being guarded is narrow and was written twice, so guard exactly it: that a
+    // single-transaction STOA-native call is unsponsored, or that its signer pays their own gas.
+    const paras = CANON.split(/\n\s*\n/);
+    const offenders = paras.filter(
+      (p) => /\bdoes not sponsor\b|\bpays? (its|their|the signing account's) own( STOA)? gas\b/i.test(p)
+          && !/\b(false|retracted|claimed|earlier version)\b/i.test(p));
+    expect(offenders, `these paragraphs assert the retracted claim:\n${offenders.join("\n--\n")}`)
+      .toEqual([]);
+    expect(CANON).toMatch(/station pays/i);
   });
 });

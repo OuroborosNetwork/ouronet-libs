@@ -20,7 +20,8 @@ export type { ParsedCapability, CapabilityRecipe } from "./caps.js";
 export { formatForType, formatDecimal, formatInteger, formatString, formatBool } from "./format.js";
 // THE TOOLTIP CANON. Shared implementation rather than a shared document -- see TOOLTIP-CANON.md
 // for why each rule exists, and `tooltip.ts` for the rules themselves.
-export { tooltipModel, tooltipModels, signatureRows, isNativeKey, isPlaceholder,
-         PLACEHOLDER, NATIVE_SIGNATURES } from "./tooltip.js";
+export { tooltipModel, tooltipModels, signatureRows, chainOf, isOffRegistryKey,
+         isNativeKey, isPlaceholder, PLACEHOLDER,
+         STOA_SIGNATURES, KADENA_SIGNATURES, NATIVE_SIGNATURES } from "./tooltip.js";
 export type { TooltipModel, TooltipSlot, TooltipPreview } from "./tooltip.js";
 export type * from "./types.js";

@@ -21,6 +21,19 @@ This file explains **why** each rule exists. Every one is here because it was go
 
 ---
 
+## Rule 0 — this tooltip is for CHAINWEB calls only
+
+It describes a **Pact call on a Chainweb chain**: what function, what arguments, what it costs. A
+button that transacts on **Arweave**, or any other non-Chainweb chain, has none of those things in
+this shape.
+
+**Such a button gets no tooltip of this kind — not an empty one.** An empty panel reads as "the
+price failed to load"; absence reads as "this is a different kind of thing", which is the truth.
+If you want an affordance there, write a different one; do not stretch this model over it.
+
+`chainOf(key)` returns `undefined` for anything this model cannot describe, and `tooltipModels()`
+drops such keys rather than throwing. That is how a caller learns to render nothing.
+
 ## Rule 1 — show every execution parameter
 
 All of them, always, in declared order.
@@ -74,19 +87,37 @@ already the widest thing on screen when it opens. A parallel row costs one line.
 
 `signatureRows(m)` returns `{ names, types }` as equal-length arrays for exactly this.
 
-## Rule 4 — native is not Ouronet, and the difference is narrower than it looks
+## Rule 4 — three worlds, and they must be distinguishable
 
-A `coin.*` call is StoaChain's own root-namespace contract. It is **not** in this registry and
-never will be: the registry is generated from `ouronet-ns`.
+`kind` is `"ouronet"`, `"stoa"` or `"kadena"`. Only the first is in this registry; the other two
+are transcribed by hand in `STOA_SIGNATURES` and `KADENA_SIGNATURES`.
 
-What is actually different:
+| | `ouronet` | `stoa` | `kadena` |
+|---|---|---|---|
+| what it is | the `ouronet-ns` surface | StoaChain's own `coin` | **Kadena mainnet's `coin`** |
+| INFO_ preview | yes | **no** | **no** |
+| IGNIS | collected | **none** | **none** |
+| accounts | Ouronet glyph strings | `k:` `c:` `u:` `w:` | `k:` principals |
+| gas | station pays | **station pays** | **a different chain's gas entirely** |
 
-| | Ouronet | native |
-|---|---|---|
-| INFO_ preview | yes | **no** — nothing prices a `coin` call |
-| IGNIS | collected | **none** |
-| accounts | Ouronet glyph strings | **Kadena-shaped** (`k:` `c:` `u:` `w:`) |
-| gas sponsorship | gas station pays | **gas station pays** — the same |
+**`kadena` is not a variant of the other two.** Different chain, different gas, different balances;
+nothing about Ouronet's gas station or IGNIS applies to it. Getting this wrong is worse than the
+other confusions on this page, because a user who thinks a Kadena transfer is sponsored is wrong
+about their own money.
+
+**Both chains call their contract `coin`.** StoaChain uses Ouronet-style names (`C_Transfer`,
+`C_URV|Stake`); Kadena uses KIP-0002 kebab-case (`transfer`, `transfer-create`). Nothing collides
+today, and `chainOf` **throws** rather than guesses if anything ever does — picking wrong would
+describe a call on the wrong chain, which is the kind of wrong that looks right.
+
+Note `coin.transfer-crosschain` is a **`defpact`** — a multi-step continuation. Worth saying out
+loud in a renderer: its later steps are not sponsored by anybody.
+
+**The sponsorship row is the one to get right.** An earlier version of this claimed a StoaChain
+native call was not sponsored and that the signing account paid its own gas. Both false: every
+native modal carries `GAS_PAYER` on the gas-station key and says so in its own header comment. The
+claim had been *inferred* from "this is not an Ouronet operation", which says nothing about who
+pays the host chain — and it was wrong in the direction that matters.
 
 **That last row is the one to get right.** An earlier version of this claimed a native call was
 not sponsored and that the signing account paid its own STOA gas. Both false: every native modal
@@ -103,10 +134,10 @@ matter.
 
 In practice:
 
-| | native (`coin.*`) | Ouronet (`ouronet-ns.*`) |
-|---|---|---|
-| OuronetUI | gold `#ceac5f` | blue `#3b82f6` |
-| Codex | *its own* | violet |
+| | `stoa` | `ouronet` | `kadena` |
+|---|---|---|---|
+| OuronetUI | gold `#ceac5f` | blue `#3b82f6` | *(not surfaced)* |
+| Codex | *its own* | violet | **green** |
 
 Whatever you choose, make it carry meaning rather than decoration, and **say what is missing**
 rather than leaving the cost panel empty — an empty panel reads as "the price failed to load".
@@ -118,8 +149,13 @@ no IGNIS — this is not an Ouronet operation
 a StoaChain `coin` call, so nothing prices it. Gas is still sponsored.
 ```
 
-Signatures for the native calls are in `NATIVE_SIGNATURES`, transcribed from the deployed
-contract with line numbers. Use them rather than typing your own.
+Signatures are in `STOA_SIGNATURES` and `KADENA_SIGNATURES`, transcribed from the deployed
+contracts with line numbers. Use them rather than typing your own.
+
+**Make the distinction run in every direction.** We coloured `stoa` gold and left `ouronet` on the
+panel's ordinary grey — so the distinction existed one way only, and a reader who never hovered a
+native button learned no rule at all. Gold then reads as "something is odd about this one" rather
+than as a category. Give every kind a colour and a label, not just the exceptional ones.
 
 ## Rule 5 — a ghost is not data
 
