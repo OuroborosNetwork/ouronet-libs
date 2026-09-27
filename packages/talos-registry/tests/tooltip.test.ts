@@ -8,7 +8,8 @@
 import { describe, expect, it } from "vitest";
 import {
   tooltipModel, tooltipModels, signatureRows, chainOf, PLACEHOLDER,
-  STOA_SIGNATURES, KADENA_SIGNATURES,
+  STOA_SIGNATURES, KADENA_SIGNATURES, CHAIN_PALETTE, CHAIN_LABEL, CONSUMERS,
+  type Chain,
 } from "../src/tooltip.js";
 import { registry, entrypointKeys, getEntrypoint, getPreview } from "../src/registry.js";
 import { readFileSync } from "node:fs";
@@ -285,5 +286,53 @@ describe("TOOLTIP-CANON.md quotes figures that are still true", () => {
     expect(offenders, `these paragraphs assert the retracted claim:\n${offenders.join("\n--\n")}`)
       .toEqual([]);
     expect(CANON).toMatch(/station pays/i);
+  });
+});
+
+describe("rule 4 — the palette is canon, and the caller zone names the app", () => {
+  it("gives every chain a DISTINCT colour", () => {
+    const cs = Object.values(CHAIN_PALETTE);
+    expect(new Set(cs).size, `duplicate colour: ${cs.join(" ")}`).toBe(cs.length);
+  });
+
+  it("covers every chain the model can produce — no kind without a colour", () => {
+    // If `Chain` gains a member, this fails rather than rendering it with `undefined`, which CSS
+    // silently ignores and which therefore looks like "no border rule" rather than a bug.
+    const kinds = new Set<string>();
+    for (const k of entrypointKeys().slice(0, 5)) kinds.add(tooltipModel(k).kind);
+    kinds.add(tooltipModel("coin.C_URV|Stake").kind);
+    kinds.add(tooltipModel("coin.transfer").kind);
+    for (const k of kinds) {
+      expect(CHAIN_PALETTE[k as Chain], `${k} has no colour`).toBeTruthy();
+      expect(CHAIN_LABEL[k as Chain], `${k} has no label`).toBeTruthy();
+    }
+  });
+
+  it("puts the colour and label on the model, so a renderer cannot pick a different one", () => {
+    const m = tooltipModel("coin.transfer");
+    expect(m.chainColor).toBe(CHAIN_PALETTE.kadena);
+    expect(m.chainLabel).toBe("KADENA");
+    expect(tooltipModel(TRANSFER).chainColor).toBe(CHAIN_PALETTE.ouronet);
+    expect(tooltipModel("coin.C_URV|Stake").chainColor).toBe(CHAIN_PALETTE.stoa);
+  });
+
+  it("carries the consumer when told, and omits it when not", () => {
+    expect(tooltipModel(TRANSFER).consumer).toBeUndefined();
+    expect(tooltipModel(TRANSFER, {}, CONSUMERS.Codex).consumer?.name).toBe("Codex");
+    expect(tooltipModels([TRANSFER, "coin.transfer"], {}, CONSUMERS.OuronetUI)
+      .every((m) => m.consumer?.name === "OuronetUI")).toBe(true);
+  });
+
+  it("keeps consumer accents OFF the chain axis", () => {
+    // Two axes, deliberately: the border says what you are looking at, the caller zone says who
+    // is showing it. A consumer accent that collided with a chain colour would merge them.
+    const chain = new Set(Object.values(CHAIN_PALETTE));
+    for (const c of Object.values(CONSUMERS))
+      expect(chain.has(c.accent), `${c.name}'s accent ${c.accent} is a chain colour`).toBe(false);
+  });
+
+  it("names the two consumers with the spelling their codex settings already use", () => {
+    expect(Object.keys(CONSUMERS).sort()).toEqual(["Codex", "OuronetUI"]);
+    for (const [k, v] of Object.entries(CONSUMERS)) expect(v.name).toBe(k);
   });
 });

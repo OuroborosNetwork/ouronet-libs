@@ -126,21 +126,61 @@ header comment. The claim had been *inferred* from "this is not an Ouronet opera
 nothing about who pays the host chain — and it was wrong in the direction that matters, telling a
 user they were about to spend when they were not.
 
-**Make the two visually distinct — the palette is yours.** The distinction is mandatory because
-the two differ in what they cost and what can be previewed; the specific colour is presentation,
-and this package does not get a vote on your design language. A rule that mandates a palette in
-someone else's application is a rule that gets ignored, and an ignored rule weakens the ones that
-matter.
+### The palette is canon — `CHAIN_PALETTE`
 
-In practice:
+| chain | colour | |
+|---|---|---|
+| `ouronet` | `#3b82f6` | **blue** |
+| `stoa` | `#ceac5f` | **gold** |
+| `kadena` | `#22c55e` | **green** |
 
-| | `stoa` | `ouronet` | `kadena` |
-|---|---|---|---|
-| OuronetUI | gold `#ceac5f` | blue `#3b82f6` | *(not surfaced)* |
-| Codex | *its own* | violet | **green** |
+**This reverses the 1.4.0 position**, which said the palette was each app's business. The
+reasoning then — that a package should not dictate colours inside someone else's design language —
+was right about *decoration* and wrong about *this*. The colour encodes **which chain your money
+is on**. Two apps teaching different meanings for the same colour is worse than neither using
+colour at all, because a user believes whichever they learned first, and these two apps share
+users.
 
-Whatever you choose, make it carry meaning rather than decoration, and **say what is missing**
-rather than leaving the cost panel empty — an empty panel reads as "the price failed to load".
+`m.chainColor` and `m.chainLabel` are on the model so a renderer cannot quietly pick a different
+one, and a test asserts every chain has both — if `Chain` ever gains a member without a colour,
+that fails rather than rendering `undefined`, which CSS ignores and which therefore looks like
+"no border rule" instead of a bug.
+
+Colours were taken from what was already in use rather than invented: gold is OuronetUI's STOA
+accent, blue its established `#3b82f6`, green its success green — unused on any tooltip surface
+and therefore free to carry this meaning.
+
+**Make the distinction run in every direction.** We coloured `stoa` gold and left `ouronet` on the
+panel's ordinary grey, so it only existed one way: a reader who never hovered a native button
+learned no rule at all, and gold read as "something is odd about this one" rather than as a
+category. Every kind gets a colour *and* a label.
+
+And **say what is missing** rather than leaving the cost panel empty — an empty panel reads as
+"the price failed to load".
+
+## Rule 4b — say who is rendering
+
+Two applications draw this tooltip, and a Codex panel can open over an OuronetUI page. That is
+exactly the case where "whose tooltip is this" is hardest to infer from chrome and most useful to
+state.
+
+**Carry a caller zone naming the consumer.** One line, its own accent:
+
+```ts
+tooltipModel(key, values, CONSUMERS.Codex)      // m.consumer -> { name, accent }
+```
+
+| consumer | accent | |
+|---|---|---|
+| `OuronetUI` | `#d2d3d4` | neutral |
+| `Codex` | `#8b5cf6` | **violet** |
+
+**Two axes, deliberately.** The border says *what you are looking at*; the caller zone says *who
+is showing it to you*. A consumer accent is therefore never a chain colour, and a test asserts the
+two sets do not intersect — the moment they do, the two meanings merge and both become unreadable.
+
+`name` matches the `consumerName` each app already uses for its codex settings, so the workspace
+has one spelling of "OuronetUI" rather than two.
 
 Suggested footer, which is what OuronetUI ships:
 
@@ -151,11 +191,6 @@ a StoaChain `coin` call, so nothing prices it. Gas is still sponsored.
 
 Signatures are in `STOA_SIGNATURES` and `KADENA_SIGNATURES`, transcribed from the deployed
 contracts with line numbers. Use them rather than typing your own.
-
-**Make the distinction run in every direction.** We coloured `stoa` gold and left `ouronet` on the
-panel's ordinary grey — so the distinction existed one way only, and a reader who never hovered a
-native button learned no rule at all. Gold then reads as "something is odd about this one" rather
-than as a category. Give every kind a colour and a label, not just the exceptional ones.
 
 ## Rule 5 — a ghost is not data
 

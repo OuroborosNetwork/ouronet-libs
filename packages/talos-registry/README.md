@@ -178,10 +178,12 @@ import { tooltipModel, signatureRows } from "@ouronet/talos-registry";
 const m = tooltipModel("TS01-C1.DPTF|C_Transfer", { id: '"OURO-8Nh-JO8JO4F5"' });
 // m.slots -> EVERY execution parameter, in order, with type, value and flags
 // m.preview -> the INFO_ call with ITS OWN parameter list
-// m.kind -> "ouronet" | "stoa" | "kadena"   (only ouronet has a cost section)
+// m.kind       -> "ouronet" | "stoa" | "kadena"  (only ouronet has a cost section)
+// m.chainColor -> the CANONICAL border colour for that chain
+// m.consumer   -> who is rendering, for the caller zone
 ```
 
-Seven rules, each there because it was got wrong first — most recently a six-parameter transfer
+Eight rules, each there because it was got wrong first — most recently a six-parameter transfer
 whose tooltip showed five arguments, because it was rendering the preview's list under the
 execution's heading. Read the canon before building one.
 

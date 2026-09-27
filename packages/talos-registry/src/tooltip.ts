@@ -22,12 +22,22 @@
  * 3. TYPES GO ON THEIR OWN ROW. `patron:string executor:string ...` doubles the width of the
  *    widest line in the panel. A parallel row under the names costs one line and reads better.
  *
- * 4. THREE WORLDS, and they must be distinguishable at a glance. `ouronet` (the ouronet-ns
- *    surface), `stoa` (StoaChain's own `coin` contract) and `kadena` (Kadena mainnet's `coin`).
- *    They differ in what they cost and what can be previewed. Only `ouronet` has an INFO_ reader
- *    and collects IGNIS; gas is sponsored on the Stoa side regardless -- claiming otherwise tells
- *    a user they are about to spend when they are not. HOW you distinguish them is yours: `kind`
- *    is the canon, the palette is not.
+ * 4. THREE WORLDS, WITH A CANONICAL COLOUR EACH. `ouronet` (blue), `stoa` (gold), `kadena`
+ *    (green). They differ in what they cost and what can be previewed. Only `ouronet` has an
+ *    INFO_ reader and collects IGNIS; gas is sponsored on the Stoa side regardless -- claiming
+ *    otherwise tells a user they are about to spend when they are not.
+ *
+ *    THE PALETTE IS NOW CANON, reversing the 1.4.0 position that it was each app's business.
+ *    The argument then was that a package should not dictate colours inside somebody else's
+ *    design language, and that was right about DECORATION and wrong about this: the colour
+ *    encodes WHICH CHAIN YOUR MONEY IS ON. A user who learns green-means-Kadena in one app and
+ *    meets green-means-something-else in the other has been taught a falsehood by the
+ *    inconsistency, and the two apps share users. A shared vocabulary has to be shared.
+ *
+ * 4b. SAY WHO IS RENDERING. Two applications draw this tooltip, and they draw it over different
+ *    surfaces for the same chains. A caller zone naming the consumer costs one line and answers
+ *    "which app am I looking at" without the user having to infer it from chrome -- which matters
+ *    most in exactly the case where it is hardest, a Codex panel over an OuronetUI page.
  *
  * 0. CHAINWEB ONLY -- the rule that decides whether a tooltip exists at all. This model describes
  *    a PACT call on a Chainweb chain: what function, what arguments, what it costs. A button that
@@ -42,6 +52,60 @@
 import { getEntrypoint, getPreview, tryGetEntrypoint, registry } from "./registry.js";
 import { formatForType } from "./format.js";
 import type { GhostUse } from "./types.js";
+
+/** The three worlds a tooltip can describe. See rule 4. */
+export type Chain = "ouronet" | "stoa" | "kadena";
+
+/**
+ * The canonical border colour per chain. USE THESE.
+ *
+ * Not styling: the colour tells a user which chain their money is on, and that vocabulary is
+ * shared between the applications that render it. Two apps teaching different meanings for the
+ * same colour is worse than neither using colour at all, because the user believes the first one
+ * they learned.
+ *
+ *   ouronet  blue    the ouronet-ns surface -- priced, IGNIS, sponsored
+ *   stoa     gold    StoaChain's own coin -- unpriced, no IGNIS, still sponsored
+ *   kadena   green   a DIFFERENT CHAIN -- its own gas, its own balances
+ *
+ * Chosen from what was already in use rather than invented: gold is OuronetUI's STOA accent and
+ * blue its established `#3b82f6`; green is the app's existing success green, which is unused on
+ * any other tooltip surface and therefore free to carry this meaning.
+ */
+export const CHAIN_PALETTE: Readonly<Record<Chain, string>> = {
+  ouronet: "#3b82f6",
+  stoa: "#ceac5f",
+  kadena: "#22c55e",
+};
+
+/** Human label for the chain, for the border-adjacent marker. */
+export const CHAIN_LABEL: Readonly<Record<Chain, string>> = {
+  ouronet: "OURONET",
+  stoa: "STOA NATIVE",
+  kadena: "KADENA",
+};
+
+/**
+ * Who is drawing the tooltip -- rule 4b.
+ *
+ * Two applications render this, and a Codex panel can open over an OuronetUI page, which is
+ * exactly the case where "whose tooltip is this" is hardest to infer from chrome and most useful
+ * to state. The accent is the CONSUMER's identity and is deliberately a different axis from
+ * `CHAIN_PALETTE`: one says what you are looking at, the other says who is showing it to you.
+ *
+ * `name` matches the `consumerName` key each app already uses for its codex settings, so there is
+ * one spelling of "OuronetUI" across the workspace rather than two.
+ */
+export interface ConsumerIdentity {
+  name: string;
+  /** the app's own accent for the caller zone. NOT a chain colour. */
+  accent: string;
+}
+
+export const CONSUMERS: Readonly<Record<"OuronetUI" | "Codex", ConsumerIdentity>> = {
+  OuronetUI: { name: "OuronetUI", accent: "#d2d3d4" },
+  Codex: { name: "Codex", accent: "#8b5cf6" },
+};
 
 /** One parameter of the execution, with everything a renderer needs about it. */
 export interface TooltipSlot {
@@ -80,11 +144,8 @@ export interface TooltipModel {
    *   kadena   Kadena mainnet's `coin`. A DIFFERENT CHAIN -- different gas, different accounts,
    *            and nothing about Ouronet applies to it.
    *
-   * A renderer MUST make these visually distinct, because they differ in what they cost and what
-   * can be previewed. It is NOT told how: OuronetUI uses gold/blue, the Codex violet for Ouronet
-   * and green for Kadena, and all are conformant. Mandating a palette in a package consumed by
-   * applications with their own design languages is a rule that gets ignored, and an ignored rule
-   * weakens the ones that matter.
+   * Each has a canonical colour in `CHAIN_PALETTE`, and a renderer should use it: the colour
+   * encodes which chain the user's money is on, which is shared vocabulary rather than styling.
    *
    * RENAMED from `"native"` in 2.0.0. With only two worlds "native" was unambiguous; with three
    * it silently invited the question "native to WHAT" -- and both candidate answers are a
@@ -104,6 +165,12 @@ export interface TooltipModel {
    * latency the user pays for a foregone conclusion. Rule 5.
    */
   shouldRead: boolean;
+  /** the canonical border colour for `kind`. Convenience -- identical to CHAIN_PALETTE[kind]. */
+  chainColor: string;
+  /** the label to print beside it: OURONET / STOA NATIVE / KADENA. */
+  chainLabel: string;
+  /** who is rendering, for the caller zone. Undefined when the caller did not say. */
+  consumer?: ConsumerIdentity;
   /** things a renderer may want to surface. Never thrown; a tooltip must not take a page down. */
   warnings: string[];
 }
@@ -205,6 +272,7 @@ function offRegistryModel(
   key: string,
   kind: "stoa" | "kadena",
   values: Readonly<Record<string, string>>,
+  consumer?: ConsumerIdentity,
 ): TooltipModel {
   const sig = (kind === "stoa" ? STOA_SIGNATURES : KADENA_SIGNATURES)[key];
   if (!sig) throw new Error(`offRegistryModel: no signature for "${key}"`);
@@ -212,6 +280,9 @@ function offRegistryModel(
   return {
     kind,
     exec: key,
+    chainColor: CHAIN_PALETTE[kind],
+    chainLabel: CHAIN_LABEL[kind],
+    consumer,
     slots: sig.map(([name, type], i) => ({
       index: i + 1,
       name,
@@ -244,9 +315,11 @@ function offRegistryModel(
 export function tooltipModel(
   key: string,
   values: Readonly<Record<string, string>> = {},
+  consumer?: ConsumerIdentity,
 ): TooltipModel {
   const chain = chainOf(key);
-  if (chain === "stoa" || chain === "kadena") return offRegistryModel(key, chain, values);
+  if (chain === "stoa" || chain === "kadena")
+    return offRegistryModel(key, chain, values, consumer);
   if (chain === undefined && isOffRegistryKey(key))
     throw new Error(`tooltipModel: "${key}" matched no chain. This is a bug in chainOf.`);
 
@@ -325,6 +398,9 @@ export function tooltipModel(
   return {
     kind: "ouronet",
     exec: `${registry.namespace}.${key}`,
+    chainColor: CHAIN_PALETTE.ouronet,
+    chainLabel: CHAIN_LABEL.ouronet,
+    consumer,
     slots,
     preview,
     // RULE 5: do not fire a read whose answer is a foregone refusal.
@@ -344,10 +420,11 @@ export function tooltipModel(
 export function tooltipModels(
   keys: readonly string[],
   values: Readonly<Record<string, string>> = {},
+  consumer?: ConsumerIdentity,
 ): TooltipModel[] {
   return keys
     .filter((k) => chainOf(k) !== undefined)
-    .map((k) => tooltipModel(k, values));
+    .map((k) => tooltipModel(k, values, consumer));
 }
 
 /**
