@@ -237,6 +237,81 @@ which is why there are two. `tooltipModel` applies both for you.
 
 ---
 
+## Rule 7 — fill every parameter you can, and prove it
+
+A tooltip that leaves a fillable slot showing the registry's example is not "partially
+implemented". It is **wrong**, and it is wrong in the way that does not announce itself: the
+examples are real ids read from mainnet, so the panel looks like data and the preview succeeds
+against somebody else's entity.
+
+Four separate bugs came from this, all on buttons that looked fine:
+
+| what showed | what it meant |
+|---|---|
+| `ats = "Auryndex-O136CBn22ncY"` on a **SilverStoa** button | a genuine fee, for the wrong pool |
+| `patron` = the example account | `INFO_ATS\|ColdRecovery` read an empty ledger and reported a table error |
+| `rt = <no live example>` | the page knew the token and never passed it |
+| `ats1`/`ats2` = `<no live example>` | on a button whose whole question is "from where, to where" |
+
+### Fill BY ROLE, not by name
+
+Pact types cannot help: `patron`, `id`, `ats` and `swpair` are all `string`, and a value of the
+wrong kind in any of them type-checks, renders plausibly and prices the wrong thing.
+
+```ts
+paramRole("ats")      // "ats-pool"
+paramRole("rt")       // "token-id"
+paramRole("patron")   // "ouronet-account"
+paramsByRole()        // the whole vocabulary, grouped
+```
+
+Roles are **derived from the shape of each ghost**, which was read from mainnet — an Ouronet
+account is a glyph string, a pool is `Name-O136CBn22ncY`, a swap pair starts `W|`, a hibernated
+DPOF starts `H|`. Not a hand-written list of 332 names: hand-classifying the vocabulary is the
+same act that caused the bugs, a human deciding `ats` looks like a token because both are strings.
+
+**A name whose ghost is the generic `"example"` gets no role**, and nothing should be inferred
+about it. Those stay visible placeholders. As of this writing 35 names classify and the rest do
+not, which is an honest answer rather than a gap to be filled with plausible-looking values.
+
+### The check
+
+```ts
+unfilledFillable(model)   // slots with a known role and no supplied value
+```
+
+**A conformant consumer asserts this is empty for every button it renders.** That is the
+difference between "we fixed the tooltip someone complained about" and "this class cannot recur".
+
+Note what it deliberately does *not* report: placeholders (honestly unresolved) and preflight-fed
+slots (must not be invented). It answers *what did you leave on the table*, not *what is missing*.
+
+### One fill map, not one per page
+
+If two value-builders exist, they will diverge, and the divergence will be a whole category. In
+OuronetUI the dashboard's builder had an account list from day one and the token pages' had none
+at all — which is exactly why Cold Recovery errored on three pages and nowhere else. It surfaced
+only because one preview out of two happened to read a table.
+
+Derive the fill map from `paramsByRole()` once, and give every page the same one.
+
+## Rule 8 — a refusal is an answer; render it as one
+
+`No value found in table ouronet-ns.ATS_ATS|Ledger for key: SilverStoa…` is not a crash. It is the
+chain saying *this subject has no row here* — often the most useful thing the tooltip could tell
+you, and it looks like a bug.
+
+Classify before rendering:
+
+- **missing row** (`No value found in table … for key …`) → say what it means: *"no position in
+  this pool yet"*. The operation is real; the subject simply has nothing to act on.
+- **placeholder argument** → name the argument, do not show the refusal. The read was never going
+  to succeed and that is not the contract's fault.
+- **anything else** → show it. An unclassified failure is worth seeing raw.
+
+And do not fire a read that cannot succeed: `m.shouldRead` is already false when an argument is a
+placeholder.
+
 ## Placement and behaviour
 
 Not expressible in the model, so they are stated here and they are not optional.

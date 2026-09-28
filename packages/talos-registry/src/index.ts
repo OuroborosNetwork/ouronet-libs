@@ -23,7 +23,8 @@ export { formatForType, formatDecimal, formatInteger, formatString, formatBool }
 export { tooltipModel, tooltipModels, signatureRows, chainOf, isOffRegistryKey,
          isNativeKey, isPlaceholder, PLACEHOLDER,
          CHAIN_PALETTE, CHAIN_LABEL, CONSUMERS,
-         STOA_SIGNATURES, KADENA_SIGNATURES, NATIVE_SIGNATURES } from "./tooltip.js";
+         STOA_SIGNATURES, KADENA_SIGNATURES, NATIVE_SIGNATURES,
+         paramRole, paramsByRole, unfilledFillable } from "./tooltip.js";
 export type { TooltipModel, TooltipSlot, TooltipPreview, Chain,
-              ConsumerIdentity } from "./tooltip.js";
+              ConsumerIdentity, ParamRole } from "./tooltip.js";
 export type * from "./types.js";

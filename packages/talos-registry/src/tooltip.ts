@@ -122,6 +122,14 @@ export interface TooltipSlot {
   isPreflightFed: boolean;
   /** false = never prefill into an input that can reach a signed transaction (guards). */
   prefillable: boolean;
+  /**
+   * The CALLER supplied this value; it is not a ghost.
+   *
+   * Tracked in the model rather than left to each renderer, because "is this the user's data or
+   * an example?" is the question every one of this module's bugs turned on, and two consumers
+   * answering it separately is two chances to answer it differently.
+   */
+  supplied: boolean;
   /** the registry's own note about this argument, when it has one. */
   note?: string;
 }
@@ -292,6 +300,7 @@ function offRegistryModel(
       isPreflightFed: false,
       // A guard is never prefillable, on any chain. Same rule, same reason.
       prefillable: type !== "guard",
+      supplied: values[name] !== undefined,
     })),
     // No preview, deliberately. Neither chain's `coin` has a reader that prices a call, so there
     // is no cost to show -- and a renderer must SAY that rather than leaving an empty panel,
@@ -368,6 +377,7 @@ export function tooltipModel(
       isPlaceholder,
       isPreflightFed,
       prefillable: u?.zbom !== false,
+      supplied: supplied !== undefined,
       note: ep.ghost.notes?.[p.name],
     };
   });
@@ -435,4 +445,100 @@ export function tooltipModels(
  */
 export function signatureRows(m: TooltipModel): { names: string[]; types: string[] } {
   return { names: m.slots.map((s) => s.name), types: m.slots.map((s) => s.type) };
+}
+
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+// RULE 7 — FILL EVERY PARAMETER YOU CAN. The role system exists to make that checkable.
+// ───────────────────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * What KIND of thing a parameter holds.
+ *
+ * Pact types cannot answer this -- `patron`, `id`, `ats` and `swpair` are all `string`, and a
+ * value of the wrong kind in any of them type-checks, renders plausibly, and makes the preview
+ * succeed against the wrong entity. That is the defect class this whole module exists to prevent,
+ * and it has now produced four separate bugs.
+ */
+export type ParamRole =
+  | "ouronet-account" | "kadena-account"
+  | "token-id" | "dpof-id" | "ats-pool" | "swap-pool"
+  | "other";
+
+/**
+ * DERIVED FROM THE GHOST'S SHAPE, not from a hand-written list of 332 names.
+ *
+ * Hand-classifying the vocabulary would be the same act that produced the bugs: a human deciding
+ * that `ats` looks like a token because both are strings. The registry's ghosts were each resolved
+ * for their own parameter and READ FROM MAINNET, so the value's shape is evidence rather than
+ * opinion -- an Ouronet account is a glyph string, a pool is `Name-O136CBn22ncY`, a swap pair
+ * starts `W|`, a hibernated DPOF starts `H|`.
+ *
+ * A name whose ghost is the generic `"example"` gets NO role, and that is correct: nothing is
+ * known about it, so nothing should be inferred. Those render as visible placeholders.
+ */
+const ROLE_PATTERNS: ReadonlyArray<[RegExp, ParamRole]> = [
+  [/^k:/, "kadena-account"],
+  [/^[^\u0000-\u007F]\./, "ouronet-account"],
+  [/^W\|/, "swap-pool"],
+  [/^H\|/, "dpof-id"],
+  [/^[A-Za-z]+-O136CBn22ncY$/, "ats-pool"],
+  [/^[A-Z0-9]+-[A-Za-z0-9]{3}-[A-Za-z0-9]+$/, "token-id"],
+];
+
+let ROLES: Map<string, ParamRole> | null = null;
+
+function buildRoles(): Map<string, ParamRole> {
+  const out = new Map<string, ParamRole>();
+  const reg = registry as unknown as {
+    entrypoints: Record<string, any>; previews: Record<string, any>;
+  };
+  for (const coll of [reg.entrypoints, reg.previews]) {
+    for (const v of Object.values(coll)) {
+      const args = v?.ghost?.args ?? {};
+      for (const p of v?.params ?? []) {
+        if (p.type !== "string" || out.has(p.name)) continue;
+        const g = args[p.name];
+        if (typeof g !== "string" || g === "example") continue;
+        for (const [re, role] of ROLE_PATTERNS)
+          if (re.test(g)) { out.set(p.name, role); break; }
+      }
+    }
+  }
+  return out;
+}
+
+/** The role of a parameter name, or undefined when nothing is known about it. */
+export function paramRole(name: string): ParamRole | undefined {
+  if (!ROLES) ROLES = buildRoles();
+  return ROLES.get(name);
+}
+
+/** Every name this registry can classify, grouped. Useful for building a consumer's fill map. */
+export function paramsByRole(): Record<ParamRole, string[]> {
+  if (!ROLES) ROLES = buildRoles();
+  const out = {} as Record<ParamRole, string[]>;
+  for (const [n, r] of ROLES) (out[r] ??= []).push(n);
+  for (const k of Object.keys(out)) out[k as ParamRole].sort();
+  return out;
+}
+
+/**
+ * RULE 7, as a check: which slots the consumer COULD have filled and did not.
+ *
+ * A slot qualifies when its role is known and the caller supplied no value for it. Those are the
+ * ones that silently show somebody else's real id -- `ats = "Auryndex-…"` on a SilverStoa button,
+ * an example account whose pool ledger is empty, a reward token rendered as "no live example".
+ *
+ * Placeholders and preflight-fed slots are NOT reported: the first is honestly unresolved and the
+ * second must not be invented. This answers "what did you leave on the table", not "what is
+ * missing".
+ *
+ * A conformant consumer asserts this is empty for every button it renders.
+ */
+export function unfilledFillable(m: TooltipModel): TooltipSlot[] {
+  return m.slots.filter(
+    (s) => !s.supplied
+        && !s.isPlaceholder && !s.isPreflightFed
+        && paramRole(s.name) !== undefined,
+  );
 }

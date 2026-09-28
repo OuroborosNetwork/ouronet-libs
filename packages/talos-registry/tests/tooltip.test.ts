@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import {
   tooltipModel, tooltipModels, signatureRows, chainOf, PLACEHOLDER,
   STOA_SIGNATURES, KADENA_SIGNATURES, CHAIN_PALETTE, CHAIN_LABEL, CONSUMERS,
-  type Chain,
+  paramRole, paramsByRole, unfilledFillable, type Chain,
 } from "../src/tooltip.js";
 import { registry, entrypointKeys, getEntrypoint, getPreview } from "../src/registry.js";
 import { readFileSync } from "node:fs";
@@ -334,5 +334,72 @@ describe("rule 4 — the palette is canon, and the caller zone names the app", (
   it("names the two consumers with the spelling their codex settings already use", () => {
     expect(Object.keys(CONSUMERS).sort()).toEqual(["Codex", "OuronetUI"]);
     for (const [k, v] of Object.entries(CONSUMERS)) expect(v.name).toBe(k);
+  });
+});
+
+describe("rule 7 — roles are derived from evidence, and fillability is checkable", () => {
+  it("classifies the four kinds that get confused, correctly", () => {
+    expect(paramRole("patron")).toBe("ouronet-account");
+    expect(paramRole("id")).toBe("token-id");
+    expect(paramRole("rt")).toBe("token-id");
+    expect(paramRole("ats")).toBe("ats-pool");
+    expect(paramRole("ats1")).toBe("ats-pool");
+    expect(paramRole("swpair")).toBe("swap-pool");
+    expect(paramRole("dpof")).toBe("dpof-id");
+  });
+
+  it("keeps the four kinds DISJOINT — one name, one role", () => {
+    // Every bug in this module was one kind wearing another's slot.
+    const by = paramsByRole();
+    const seen = new Set<string>();
+    for (const names of Object.values(by))
+      for (const n of names) {
+        expect(seen.has(n), `${n} has two roles`).toBe(false);
+        seen.add(n);
+      }
+    expect(by["ats-pool"]).not.toContain("swpair");
+    expect(by["token-id"]).not.toContain("ats");
+    expect(by["ouronet-account"]).not.toContain("id");
+  });
+
+  it("gives NO role to a name whose ghost is the generic placeholder", () => {
+    // Nothing is known about it, so nothing is inferred. Silence beats a guess.
+    expect(paramRole("fvt-id")).toBeUndefined();
+    expect(paramRole("anchor-id")).toBeUndefined();
+    expect(paramRole("not-a-real-parameter")).toBeUndefined();
+  });
+
+  it("unfilledFillable reports exactly what a consumer left on the table", () => {
+    const bare = tooltipModel("TS01-C2.ATS|C_ColdRecovery");
+    const names = unfilledFillable(bare).map((s) => s.name).sort();
+    expect(names).toEqual(["ats", "executor", "patron"]);
+
+    const filled = tooltipModel("TS01-C2.ATS|C_ColdRecovery", {
+      patron: '"Σ.me"', executor: '"Σ.me"', ats: '"SilverStoaPillar-O136CBn22ncY"',
+    });
+    expect(unfilledFillable(filled)).toEqual([]);
+  });
+
+  it("does not report placeholders or preflight-fed slots as 'left on the table'", () => {
+    for (const k of entrypointKeys()) {
+      for (const s of unfilledFillable(tooltipModel(k))) {
+        expect(s.isPlaceholder, `${k}/${s.name}`).toBe(false);
+        expect(s.isPreflightFed, `${k}/${s.name}`).toBe(false);
+      }
+    }
+  });
+
+  it("marks `supplied` on the model, so two renderers cannot disagree about it", () => {
+    const m = tooltipModel(TRANSFER, { id: '"OURO-x"' });
+    expect(m.slots.find((s) => s.name === "id")!.supplied).toBe(true);
+    expect(m.slots.find((s) => s.name === "patron")!.supplied).toBe(false);
+  });
+
+  it("the canon documents rules 7 and 8", () => {
+    const CANON = readFileSync(join(__dirname, "..", "TOOLTIP-CANON.md"), "utf8");
+    expect(CANON).toContain("Rule 7 — fill every parameter you can");
+    expect(CANON).toContain("Rule 8 — a refusal is an answer");
+    expect(CANON).toContain("unfilledFillable");
+    expect(CANON).toContain("No value found in table");
   });
 });

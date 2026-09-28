@@ -17,7 +17,7 @@ buildCall("TS01-C1.DPTF|C_Transfer", {
 Note `1` became `1.0`. Pact's decimal lexer rejects a bare integer in a decimal slot, and that
 is the least interesting thing this package stops you getting wrong.
 
-**This build:** 423 entrypoints, 428 previews, surface `9091592ba15520f4`, generated against mainnet.
+**This build:** 423 entrypoints, 428 previews, surface `8107265a0be6edc3`, generated against mainnet.
 Every figure in this file is asserted by `tests/readme.test.ts` against the bundled snapshot, so
 a stale number fails the suite rather than misleading a reader.
 
@@ -183,7 +183,7 @@ const m = tooltipModel("TS01-C1.DPTF|C_Transfer", { id: '"OURO-8Nh-JO8JO4F5"' })
 // m.consumer   -> who is rendering, for the caller zone
 ```
 
-Eight rules, each there because it was got wrong first — most recently a six-parameter transfer
+Ten rules, each there because it was got wrong first — most recently a six-parameter transfer
 whose tooltip showed five arguments, because it was rendering the preview's list under the
 execution's heading. Read the canon before building one.
 
