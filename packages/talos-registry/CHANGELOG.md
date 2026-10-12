@@ -1,3 +1,21 @@
+## 2.2.1 — 2026-10-12
+
+**15 entrypoints deployed on-chain were never synced into the published package.** Re-running
+`REPL/tools/_registry.py --probe` against mainnet picked up everything landed since the last sync
+that this package never carried: `AQP-FVT|CC_ClearPoolSweep`, `AQP-FVT|CCp_FvtFixSlice`,
+`AQP-POOL|CC_FinalizeScoreRevoke`, `AQP-POOL|CC_UpdateScoreMultipliers`, the four
+`AQP-POOL|CC_Vacate*` ops (TrueFungible/OrtoFungible/SemiFungible/NonFungible),
+`AQP-POOL|CCp_BackfillScoreSlice`, `AQP-POOL|CCp_ReassignCollectableStakeBeneficiary`,
+`AQP-POOL|CCp_ReassignOrtoStakeBeneficiary`, `AQP-POOL|CCp_ReleaseSpecialCustodial`,
+`AQP-POOL|CCp_StakeSpecialCustodial`, `AQP-POOL|C_BeginScoreRevoke`,
+`AQP-POOL|Cp_DrainScoreSlice`. 423 → 438 entrypoints, 428 → 443 previews, surface
+`8107265a0be6edc3` → `6759484a5916ba4c`.
+
+**Why it mattered.** Consumers (OuronetUI's reassign-beneficiary and unstake flows among them)
+had nothing to build a call or preview against for any of these — not a missing feature, a
+missing sync. No contract changed as part of this release; every added entry is `"source":
+"deployed"` against an already-live module hash.
+
 ## 1.1.0 — 2026-09-26
 
 **Ghost values: 40 account-shaped parameters stopped rendering as `"example"`.**
