@@ -38,6 +38,11 @@
     "stoachain",
     "registry"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OuroborosNetwork/ouronet-libs.git",
+    "directory": "packages/talos-registry"
+  },
   "license": "Apache-2.0",
   "devDependencies": {
     "typescript": "^5.6.0",

@@ -152,6 +152,41 @@ describe("REQ-06: publish.yaml workflow invariants", () => {
   // repo for a while and was published BY HAND, which is how 2.2.1 came to exist
   // locally and never reach npm. The old regex named the two packages it knew, so
   // it kept passing at 2 while silently not covering the third.
+  /**
+   * `--provenance` REQUIRES A MATCHING `repository.url`, and the registry only
+   * says so at the very end -- after the tarball is built and uploaded:
+   *
+   *   422 Unprocessable Entity - PUT .../@ouronet%2ftalos-registry
+   *   Error verifying sigstore provenance bundle: Failed to validate repository
+   *   information: package.json: "repository.url" is "", expected to match
+   *   "https://github.com/OuroborosNetwork/ouronet-libs" from provenance
+   *
+   * talos-registry had no `repository` field at all, and nothing noticed for
+   * five releases because every one of them was published BY HAND -- a manual
+   * publish without `--provenance` never runs this check. The moment it joined
+   * the workflow, which publishes with provenance like its siblings, it failed.
+   *
+   * Checked here rather than in each package because the property is a relation
+   * between the workflow's flags and every package it publishes: add a fourth
+   * package without a repository field and this fails before CI does.
+   */
+  it("Case 5b: every package published with --provenance declares its repository", () => {
+    const EXPECTED = "https://github.com/OuroborosNetwork/ouronet-libs";
+    for (const s of allSteps()) {
+      if (typeof s.name !== "string") continue;
+      const m = s.name.match(/^Publish @ouronet\/(.+)$/i);
+      if (!m || !/--provenance/.test(String(s.run ?? ""))) continue;
+      const dir = m[1] === "talos-registry" ? "talos-registry" : m[1];
+      const pkg = JSON.parse(
+        readFileSync(resolve(repoRoot, "packages", dir, "package.json"), "utf8"));
+      const url = pkg.repository?.url ?? "";
+      expect(url, `${s.name} publishes with --provenance but declares no repository.url`)
+        .not.toBe("");
+      expect(url.replace(/^git\+/, "").replace(/\.git$/, ""),
+        `${s.name}: repository.url must match the provenance origin`).toBe(EXPECTED);
+    }
+  });
+
   it("Case 5: each of the 3 packages has its own publish step", () => {
     const publishSteps = allSteps().filter(
       (s) =>
