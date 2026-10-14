@@ -212,13 +212,50 @@ jobs:
       - name: Publish @ouronet/talos-registry
         working-directory: packages/talos-registry
         if: steps.queue.outputs.PUBLISH_TALOS_REGISTRY == 'true'
+        env:
+          NPM_PUBLISHER: ${{ secrets.NPM_PUBLISHER }}
         run: |
           V="${{ steps.queue.outputs.TAG_VERSION }}"
           if npm view @ouronet/talos-registry@${V} version >/dev/null 2>&1; then
             echo "@ouronet/talos-registry@${V} already on npm — skipping (idempotent)."
-          else
-            npm publish --access public --provenance --loglevel verbose
+            exit 0
           fi
+
+          # OIDC FIRST, ALWAYS. This is the path we want; the token below exists
+          # only to break a bootstrap loop and should stop being reachable once
+          # it has.
+          if npm publish --access public --provenance; then
+            echo "published via OIDC trusted publishing."
+            exit 0
+          fi
+
+          # THE BOOTSTRAP FALLBACK, and why it is here.
+          #
+          # npm reports an unvalidated trusted-publisher config as
+          #   POST /-/npm/v1/oidc/token/exchange/package/@ouronet%2ftalos-registry -> 404
+          #   "OIDC token exchange error - package not found"
+          # while the package page shows the connection as "Pending validation ...
+          # publish once to validate this configuration". That is circular: the
+          # config will not authorise a publish until a publish has validated it.
+          #
+          # So ONE token-authenticated publish, from this same workflow, breaks the
+          # loop. After it lands the connection validates and the OIDC attempt above
+          # succeeds on every subsequent release -- at which point this branch is
+          # dead code and NPM_PUBLISHER should be deleted from the repository
+          # secrets. It is deliberately not the primary path and never silently
+          # preferred: it only runs after OIDC has actually been tried and failed.
+          if [ -z "${NPM_PUBLISHER}" ]; then
+            echo "::error::OIDC publish failed and no NPM_PUBLISHER secret is set."
+            echo "::error::If the trusted publisher still reads 'Pending validation', add a"
+            echo "::error::granular token as NPM_PUBLISHER once to validate it, then delete it."
+            exit 1
+          fi
+          echo "::warning::OIDC publish failed; falling back to the bootstrap token."
+          cat > "${RUNNER_TEMP}/.npmrc" <<EOF
+          //registry.npmjs.org/:_authToken=${NPM_PUBLISHER}
+          EOF
+          npm publish --access public --provenance --userconfig "${RUNNER_TEMP}/.npmrc"
+          rm -f "${RUNNER_TEMP}/.npmrc"
 
       - name: Create GitHub Release for the pushed tag
         env:

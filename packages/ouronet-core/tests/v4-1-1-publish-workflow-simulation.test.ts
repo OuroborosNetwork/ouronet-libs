@@ -78,23 +78,58 @@ describe("REQ-06: publish.yaml workflow invariants", () => {
   });
 
   /**
-   * INVERTED 2026-10-14, when the workflow moved to OIDC Trusted Publishing.
+   * INVERTED 2026-10-14 when the workflow moved to OIDC Trusted Publishing, then
+   * LOOSENED the same day -- and the loosening is the interesting half.
    *
-   * This used to assert that `secrets.NPM_PUBLISHER` WAS referenced. Under
-   * trusted publishing npmjs.com trusts this repository and workflow FILENAME
-   * directly, so a long-lived token is not merely unnecessary, it is the thing
-   * being eliminated -- the previous one expired and silently broke publishing.
-   * The invariant worth pinning is therefore the opposite one: no publish token
-   * is reachable from this workflow at all.
+   * It first asserted the NPM_PUBLISHER secret WAS referenced. Under trusted
+   * publishing a long-lived token is the thing being eliminated, so it became
+   * "no npm token is reachable at all". That held until npm's own bootstrap loop
+   * turned up: a trusted-publisher connection sits in "Pending validation" until
+   * a publish validates it, and the OIDC exchange refuses to authorise a publish
+   * while it is unvalidated --
    *
-   * `secrets.GITHUB_TOKEN` / `RELEASE_TOKEN` are deliberately NOT matched here:
-   * they create the GitHub Release, and have no npm publishing power.
+   *   POST /-/npm/v1/oidc/token/exchange/package/@ouronet%2ftalos-registry -> 404
+   *   "OIDC token exchange error - package not found"
+   *
+   * -- so exactly one token-authenticated publish is needed to break it.
+   *
+   * A flat ban would have been a test that is right in principle and blocks the
+   * only route to the state it describes. What is worth pinning is not the
+   * ABSENCE of a token but its SUBORDINATION: OIDC must be attempted first, and a
+   * token may only run after that attempt has failed. That property survives the
+   * bootstrap, and it is the one that would actually be violated by someone
+   * quietly putting the token back in front because it is easier.
+   *
+   * Delete the secret once the connection validates; this test stays either way.
    */
-  it("Case 4: no long-lived npm publish token is referenced (trusted publishing)", () => {
-    const wholeFile = readFileSync(workflowPath, "utf8");
-    const tokenRefs = wholeFile.match(/secrets\.(NPM_\w+|\w*NPM_TOKEN\w*)/g) ?? [];
-    expect(tokenRefs, `workflow still reaches for an npm token: ${tokenRefs.join(", ")}`)
-      .toEqual([]);
+  it("Case 4: OIDC is attempted before any token-authenticated publish", () => {
+    for (const s of allSteps()) {
+      if (typeof s.name !== "string" || !/^Publish @ouronet\//i.test(s.name)) continue;
+      const script = String(s.run ?? "");
+      const publishes = [...script.matchAll(/npm publish[^\n]*/g)].map(m => m[0]);
+      if (publishes.length === 0) continue;
+      // The FIRST publish in a step must be the unauthenticated (OIDC) one.
+      expect(publishes[0], `${s.name}: the first publish must not carry a token`)
+        .not.toMatch(/--userconfig|_authToken/);
+      // Any token-bearing publish must come after it, never instead of it.
+      const tokenIdx = publishes.findIndex(p => /--userconfig/.test(p));
+      if (tokenIdx !== -1) {
+        expect(tokenIdx, `${s.name}: a token publish must not precede the OIDC attempt`)
+          .toBeGreaterThan(0);
+      }
+    }
+  });
+
+  /**
+   * The token, where one exists at all, must never reach a file the repository
+   * keeps. The bootstrap fallback writes its .npmrc under RUNNER_TEMP and removes
+   * it; an earlier version of this workflow wrote `.npmrc` into the checkout root,
+   * which is one `npm pack` away from shipping a credential inside a tarball.
+   */
+  it("Case 4c: no step writes an .npmrc into the working tree", () => {
+    const whole = readFileSync(workflowPath, "utf8");
+    expect(whole).not.toMatch(/cat\s*>\s*\.npmrc/);
+    expect(whole).not.toMatch(/>\s*\$\{\{?\s*github\.workspace/);
   });
 
   /**
