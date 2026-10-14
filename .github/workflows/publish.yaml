@@ -56,6 +56,10 @@ jobs:
         with:
           node-version: 22
           cache: npm
+          # REQUIRED FOR OIDC, not cosmetic: this is what writes an .npmrc naming
+          # the registry. Without it npm has no registry context for the token
+          # exchange and goes straight to "you are not logged in".
+          registry-url: 'https://registry.npmjs.org'
 
       # TRUSTED PUBLISHING NEEDS npm >= 11.5.1, and Node 22 ships 10.x. Without
       # this the publish steps below look for an auth token that no longer
@@ -213,7 +217,7 @@ jobs:
           if npm view @ouronet/talos-registry@${V} version >/dev/null 2>&1; then
             echo "@ouronet/talos-registry@${V} already on npm — skipping (idempotent)."
           else
-            npm publish --access public --provenance
+            npm publish --access public --provenance --loglevel verbose
           fi
 
       - name: Create GitHub Release for the pushed tag
