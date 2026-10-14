@@ -19,10 +19,18 @@ import { dirname, resolve } from "node:path";
 // @ts-expect-error -- js-yaml v4 ships its own bundled types via .d.ts inside the package; no @types/js-yaml needed at runtime, but tsc resolution needs the suppression in CI
 import yaml from "js-yaml";
 
-describe("REQ-06: publish.yml workflow invariants", () => {
+describe("REQ-06: publish.yaml workflow invariants", () => {
   const here = dirname(fileURLToPath(import.meta.url));
   const repoRoot = resolve(here, "..", "..", "..");
-  const workflowPath = resolve(repoRoot, ".github", "workflows", "publish.yml");
+  // `publish.yaml`, NOT `publish.yml`, and the extension is load-bearing: npm's
+  // trusted publisher for @ouronet/talos-registry pins this exact filename, and
+  // npm fixes that field when the connection is created -- changing it means
+  // deleting the connection and making a new one. Renaming this file back to
+  // `.yml` would leave OIDC unable to match and every publish would fail with
+  // ENEEDAUTH, which reads like a missing login rather than a renamed file.
+  // Pinned here deliberately rather than globbed for either extension: a test
+  // that accepted both would pass while publishing stayed broken.
+  const workflowPath = resolve(repoRoot, ".github", "workflows", "publish.yaml");
   const workflow = yaml.load(readFileSync(workflowPath, "utf8")) as any;
 
   const allSteps = (): any[] => {

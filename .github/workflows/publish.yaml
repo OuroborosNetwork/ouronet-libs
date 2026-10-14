@@ -17,8 +17,13 @@ name: Publish to npmjs.org
 #   * `npm` must be >= 11.5.1. `setup-node` still ships npm 10.x with Node 22,
 #     so the upgrade step below is REQUIRED, not hygiene: without it npm falls
 #     back to looking for a token and the publish fails with a 404.
-#   * The trusted publisher on npmjs.com is pinned to THIS FILENAME. Renaming
-#     this file silently breaks publishing until the connection is recreated.
+#   * The trusted publisher on npmjs.com is pinned to THIS FILENAME, extension
+#     included -- `publish.yaml`, not `publish.yml`, which is why it differs from
+#     its `.yml` siblings in this directory. npm fixes that field when the
+#     connection is created, so renaming this file means deleting the connection
+#     and making a new one; until then every publish fails with ENEEDAUTH, which
+#     reads like a missing login rather than a renamed file. Measured: the first
+#     attempt failed exactly this way, with the file at `.yml`.
 #
 # The two carry independent version lines, so a release is normally ONE tag for
 # ONE package (v4.3.6 → ouronet-core; v0.5.7 → ouronet-codex). At least one
