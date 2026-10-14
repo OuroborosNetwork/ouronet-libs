@@ -18,12 +18,12 @@ name: Publish to npmjs.org
 #     so the upgrade step below is REQUIRED, not hygiene: without it npm falls
 #     back to looking for a token and the publish fails with a 404.
 #   * The trusted publisher on npmjs.com is pinned to THIS FILENAME, extension
-#     included -- `publish.yaml`, not `publish.yml`, which is why it differs from
-#     its `.yml` siblings in this directory. npm fixes that field when the
-#     connection is created, so renaming this file means deleting the connection
-#     and making a new one; until then every publish fails with ENEEDAUTH, which
-#     reads like a missing login rather than a renamed file. Measured: the first
-#     attempt failed exactly this way, with the file at `.yml`.
+#     included. It is `publish.yml`. This has been wrong in both directions: the
+#     connection first read `publish.yaml` and this file was renamed to match,
+#     then the connection was recreated as `publish.yml` and the rename became
+#     the mismatch. Rename this file ONLY together with the connection.
+#     A mismatch is refused as "OIDC token exchange error - package not found",
+#     which names neither the file nor the mismatch.
 #
 # The two carry independent version lines, so a release is normally ONE tag for
 # ONE package (v4.3.6 → ouronet-core; v0.5.7 → ouronet-codex). At least one
@@ -36,6 +36,10 @@ on:
   push:
     tags:
       - "v*"
+  # MANUAL, FOR THE OIDC PROBE BELOW. The claim npm matches names this workflow
+  # FILE, so a probe that lives anywhere else proves nothing about this one.
+  # Dispatching runs the probe and stops; every publishing step is tag-gated.
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -77,18 +81,43 @@ jobs:
           echo "repo           : ${GITHUB_REPOSITORY}"
           echo "workflow ref   : ${GITHUB_WORKFLOW_REF}"
 
+      - name: OIDC exchange probe (does the trusted publisher actually match?)
+        run: |
+          set -o pipefail
+          PKG="@ouronet%2ftalos-registry"
+          TOK=$(curl -sS -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+                "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm%3Aregistry.npmjs.org" \
+                | python3 -c 'import sys,json;print(json.load(sys.stdin)["value"])')
+          CODE=$(curl -sS -o /tmp/exchange.json -w '%{http_code}' -X POST \
+                 -H "Authorization: Bearer ${TOK}" -H "Content-Type: application/json" \
+                 "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${PKG}")
+          echo "exchange HTTP ${CODE}"
+          sed -E 's/"token":"[^"]*"/"token":"***"/g' /tmp/exchange.json || true
+          echo
+          if [ "${CODE}" = "200" ]; then
+            echo "::notice::Trusted publisher MATCHES — a real publish will go out over OIDC."
+          else
+            echo "::warning::Trusted publisher did NOT match (HTTP ${CODE}). Compare the ref below"
+            echo "::warning::with the connection on npmjs.com, filename extension included:"
+            echo "::warning::  ${GITHUB_WORKFLOW_REF}"
+          fi
+          rm -f /tmp/exchange.json
+
       - name: Install dependencies
+        if: github.ref_type == 'tag'
         run: npm install --prefer-offline --no-audit --no-fund
 
       # typecheck → build → test gates the publish. Build precedes test so any
       # dist-resolved imports exist.
       - name: Typecheck + Build + Test
+        if: github.ref_type == 'tag'
         run: |
           npm run typecheck
           npm run build
           npm test
 
       - name: Detect publish queue (which package matches the tag?)
+        if: github.ref_type == 'tag'
         id: queue
         run: |
           TAG_VERSION="${GITHUB_REF#refs/tags/v}"
@@ -119,6 +148,7 @@ jobs:
       # Each queued package's own README + CHANGELOG must reference the shipping
       # version — they're what npmjs.com renders.
       - name: Verify README + CHANGELOG parity for queued packages
+        if: github.ref_type == 'tag'
         run: |
           TAG_VERSION="${{ steps.queue.outputs.TAG_VERSION }}"
           QUEUED=()
@@ -166,7 +196,7 @@ jobs:
       # Idempotent: skip when the version is already on the registry.
       - name: Publish @ouronet/ouronet-core
         working-directory: packages/ouronet-core
-        if: steps.queue.outputs.PUBLISH_OURONET_CORE == 'true'
+        if: github.ref_type == 'tag' && steps.queue.outputs.PUBLISH_OURONET_CORE == 'true'
         run: |
           V="${{ steps.queue.outputs.TAG_VERSION }}"
           if npm view @ouronet/ouronet-core@${V} version >/dev/null 2>&1; then
@@ -177,7 +207,7 @@ jobs:
 
       - name: Publish @ouronet/ouronet-codex
         working-directory: packages/ouronet-codex
-        if: steps.queue.outputs.PUBLISH_OURONET_CODEX == 'true'
+        if: github.ref_type == 'tag' && steps.queue.outputs.PUBLISH_OURONET_CODEX == 'true'
         run: |
           V="${{ steps.queue.outputs.TAG_VERSION }}"
           if npm view @ouronet/ouronet-codex@${V} version >/dev/null 2>&1; then
@@ -211,7 +241,7 @@ jobs:
 
       - name: Publish @ouronet/talos-registry
         working-directory: packages/talos-registry
-        if: steps.queue.outputs.PUBLISH_TALOS_REGISTRY == 'true'
+        if: github.ref_type == 'tag' && steps.queue.outputs.PUBLISH_TALOS_REGISTRY == 'true'
         env:
           NPM_PUBLISHER: ${{ secrets.NPM_PUBLISHER }}
         run: |
@@ -258,6 +288,7 @@ jobs:
           rm -f "${RUNNER_TEMP}/.npmrc"
 
       - name: Create GitHub Release for the pushed tag
+        if: github.ref_type == 'tag'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
         run: |

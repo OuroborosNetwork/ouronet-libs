@@ -19,18 +19,24 @@ import { dirname, resolve } from "node:path";
 // @ts-expect-error -- js-yaml v4 ships its own bundled types via .d.ts inside the package; no @types/js-yaml needed at runtime, but tsc resolution needs the suppression in CI
 import yaml from "js-yaml";
 
-describe("REQ-06: publish.yaml workflow invariants", () => {
+describe("REQ-06: publish.yml workflow invariants", () => {
   const here = dirname(fileURLToPath(import.meta.url));
   const repoRoot = resolve(here, "..", "..", "..");
-  // `publish.yaml`, NOT `publish.yml`, and the extension is load-bearing: npm's
-  // trusted publisher for @ouronet/talos-registry pins this exact filename, and
-  // npm fixes that field when the connection is created -- changing it means
-  // deleting the connection and making a new one. Renaming this file back to
-  // `.yml` would leave OIDC unable to match and every publish would fail with
-  // ENEEDAUTH, which reads like a missing login rather than a renamed file.
-  // Pinned here deliberately rather than globbed for either extension: a test
-  // that accepted both would pass while publishing stayed broken.
-  const workflowPath = resolve(repoRoot, ".github", "workflows", "publish.yaml");
+  // PINNED TO WHAT NPM'S TRUSTED PUBLISHER SAYS, which is `publish.yml`.
+  //
+  // This pin has now been wrong in BOTH directions, and the reason is worth
+  // keeping. The connection first read `publish.yaml`, so this file was renamed
+  // to match; the connection was then deleted and recreated as `publish.yml`,
+  // so the rename became the mismatch. Two parties each adjusting to the other's
+  // last known state is not a race condition in software, it is one in process.
+  //
+  // The claim npm matches is the full workflow ref:
+  //   OuroborosNetwork/ouronet-libs/.github/workflows/publish.yml@refs/tags/vX.Y.Z
+  // A mismatch is refused with "OIDC token exchange error - package not found",
+  // which names neither the file nor the mismatch.
+  //
+  // CHANGE THIS ONLY TOGETHER WITH THE CONNECTION, never on its own.
+  const workflowPath = resolve(repoRoot, ".github", "workflows", "publish.yml");
   const workflow = yaml.load(readFileSync(workflowPath, "utf8")) as any;
 
   const allSteps = (): any[] => {
