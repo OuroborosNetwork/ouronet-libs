@@ -31,5 +31,5 @@
     "type": "git",
     "url": "https://github.com/OuroborosNetwork/ouronet-libs.git"
   },
-  "license": "UNLICENSED"
+  "license": "Apache-2.0"
 }

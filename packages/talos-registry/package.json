@@ -37,7 +37,7 @@
     "stoachain",
     "registry"
   ],
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "devDependencies": {
     "typescript": "^5.6.0",
     "vitest": "^2.1.0",
