@@ -51,11 +51,11 @@ lists five rows for a six-parameter function is not a summary — it is a wrong 
 teaches a call shape that will not work.
 
 `tooltipModel().slots` is always exactly the entrypoint's own parameters. A test asserts this for
-**all 423**, not for the one that was reported.
+**all 439**, not for the one that was reported.
 
 ## Rule 2 — the arguments belong to the execution, the cost belongs to the preview
 
-**410 of the 423 entrypoints have a preview whose parameter list differs from their own.** Only 13
+**423 of the 439 entrypoints have a preview whose parameter list differs from their own.** Only 16
 match. Different names, different order, different arity.
 
 So the two cannot share one numbered list, and the preview's values cannot be labelled with the
@@ -369,5 +369,5 @@ ZBOM rather than open one.
 ## Sources
 
 - `src/tooltip.ts` — the canon itself; `tests/tooltip.test.ts` enforces all six rules
-- 410-of-423 preview divergence, 225 placeholder slots: recomputed from the bundled registry
+- 423-of-439 preview divergence, 225 placeholder slots: recomputed from the bundled registry
 - The sponsorship correction: owner, 2026-09-27

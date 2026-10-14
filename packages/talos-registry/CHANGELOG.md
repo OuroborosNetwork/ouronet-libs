@@ -1,3 +1,38 @@
+## 2.3.0 — 2026-10-14
+
+**The reassign-beneficiary surface moved, and this package had not caught up.** Re-synced
+against mainnet (surface `6759484a5916ba4c` → `77a4205182ce2954`, 438 → 439 entrypoints,
+443 → 444 previews):
+
+- `AQP-POOL|CCp_ReassignOrtoStakeBeneficiary` and `AQP-POOL|CCp_ReassignCollectableStakeBeneficiary`
+  (the Hydra multi-tx recipe shape) are GONE, replaced one-for-one by plain, single-transaction
+  `AQP-POOL|CC_ReassignOrtoStakeBeneficiary` / `AQP-POOL|CC_ReassignCollectableStakeBeneficiary` —
+  the recipe shape was never warranted for these; see the sovereign repo's own patron-slots /
+  executor-canon notes for why.
+- NEW: `AQP-POOL|CC_ReassignTrueFungibleStakeBeneficiary`, the true-fungible counterpart that
+  did not exist before, plus its preview `AQP-INFO.INFO_AQP-POOL|ReassignTrueFungibleStakeBeneficiary`.
+
+**Why a minor bump, not a patch.** Two public entrypoint names disappeared (renamed, not merely
+added-alongside), which is consumer-breaking for anyone who had built against the `CCp_` names.
+No published version of this package ever carried them as deployed-and-callable in production
+use beyond the sovereign repo's own direct chain calls, so the practical blast radius is believed
+to be zero — recorded as a minor rather than a patch anyway, because "believed to be zero" is not
+the same claim as "is zero".
+
+**The surface hash moved twice before this shipped, and only the last one is in the data.** An
+intermediate build carried `03e494c800f38a5e`; it was never published. A module hash is part of
+every entry's provenance, so ANY redeploy of a module moves the surface hash even when no name,
+parameter or type changes — and between that build and this one, the sovereign `PureV11` round
+redeployed `TS02-C3` (plus `AQP-INFO` and `AQP-BOOT`, its two dot-pinned callers) to remove 14
+redundant `@event` annotations from Talos capabilities that merely forward to an already-evented
+core capability. **No entrypoint, parameter list or type in this package changed as a result** —
+only the hashes under `provenance`. Confirmed live the same day: `_registrylive.py` records
+`verifiedAt 2026-10-14`, surface `77a4205182ce2954`.
+
+**Published only after** OuronetUI's full True-Fungible/LP unstake flow — including Change
+Beneficiary against these three calls — was wired and verified end to end against a local link of
+this exact package.
+
 ## 2.2.1 — 2026-10-12
 
 **15 entrypoints deployed on-chain were never synced into the published package.** Re-running
