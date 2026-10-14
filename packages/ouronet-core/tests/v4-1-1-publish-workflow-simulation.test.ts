@@ -193,6 +193,24 @@ describe("REQ-06: publish.yml workflow invariants", () => {
     }
   });
 
+  /**
+   * A PRERELEASE MUST NOT BECOME `latest`. npm applies the `latest` dist-tag to
+   * whatever it publishes unless told otherwise -- being a prerelease is NOT
+   * enough on its own, which is the part that surprises people. Publishing a
+   * 2.3.1-0 without `--tag` would make it what every consumer of
+   * `@ouronet/talos-registry` resolves to.
+   */
+  it("Case 5c: a prerelease version is published off the latest tag", () => {
+    for (const s of allSteps()) {
+      if (typeof s.name !== "string" || !/^Publish @ouronet\//i.test(s.name)) continue;
+      const script = String(s.run ?? "");
+      expect(script, `${s.name} must route prerelease versions off 'latest'`)
+        .toMatch(/case\s+"\$\{V\}"\s+in\s+\*-\*\)/);
+      expect(script, `${s.name} must pass the chosen dist-tag to npm publish`)
+        .toMatch(/npm publish[^\n]*\$\{DIST\}/);
+    }
+  });
+
   it("Case 5: each of the 3 packages has its own publish step", () => {
     const publishSteps = allSteps().filter(
       (s) =>

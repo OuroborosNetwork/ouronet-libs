@@ -1,3 +1,24 @@
+## 2.3.1-0 — 2026-10-14
+
+**No functional change. This release exists to activate OIDC trusted publishing.**
+
+2.3.0 was published from CI on a bootstrap token, not through the trusted
+publisher, because the workflow filename in the OIDC claim did not match the one
+the connection was created with (`publish.yaml` against `publish.yml`). npm
+refuses a mismatch with "OIDC token exchange error - package not found", which
+names neither the file nor the mismatch, and the connection stayed "Pending
+validation" because no publish had ever arrived through it.
+
+With the names agreed, the exchange endpoint returns `201 Created` and a live
+token for this repository's workflow. Validating that requires a publish through
+the publisher, and a published version cannot be republished -- hence a
+prerelease rather than a second attempt at 2.3.0.
+
+**Tagged `next`, deliberately, so `latest` stays 2.3.0.** npm applies `latest` to
+whatever it publishes unless told otherwise, prerelease or not; consumers
+resolving `@ouronet/talos-registry` are unaffected by this version and should not
+install it.
+
 ## 2.3.0 — 2026-10-14
 
 **The reassign-beneficiary surface moved, and this package had not caught up.** Re-synced

@@ -203,10 +203,14 @@ jobs:
         if: github.ref_type == 'tag' && steps.queue.outputs.PUBLISH_OURONET_CORE == 'true'
         run: |
           V="${{ steps.queue.outputs.TAG_VERSION }}"
+          # A PRERELEASE MUST NOT TAKE `latest` -- see the talos-registry step.
+          DIST=""
+          case "${V}" in *-*) DIST="--tag next";; esac
+
           if npm view @ouronet/ouronet-core@${V} version >/dev/null 2>&1; then
             echo "@ouronet/ouronet-core@${V} already on npm — skipping (idempotent)."
           else
-            npm publish --access public --provenance
+            npm publish --access public --provenance ${DIST}
           fi
 
       - name: Publish @ouronet/ouronet-codex
@@ -214,10 +218,14 @@ jobs:
         if: github.ref_type == 'tag' && steps.queue.outputs.PUBLISH_OURONET_CODEX == 'true'
         run: |
           V="${{ steps.queue.outputs.TAG_VERSION }}"
+          # A PRERELEASE MUST NOT TAKE `latest` -- see the talos-registry step.
+          DIST=""
+          case "${V}" in *-*) DIST="--tag next";; esac
+
           if npm view @ouronet/ouronet-codex@${V} version >/dev/null 2>&1; then
             echo "@ouronet/ouronet-codex@${V} already on npm — skipping publish."
           else
-            npm publish --access public --provenance
+            npm publish --access public --provenance ${DIST}
           fi
 
           # `npm publish` already points `latest` at this version. This step
@@ -258,7 +266,14 @@ jobs:
           # OIDC FIRST, ALWAYS. This is the path we want; the token below exists
           # only to break a bootstrap loop and should stop being reachable once
           # it has.
-          if npm publish --access public --provenance; then
+          # A PRERELEASE MUST NOT TAKE `latest`. npm applies `latest` to whatever
+          # it publishes unless told otherwise -- prerelease or not -- so a
+          # 2.3.1-0 would silently become what every consumer resolves to.
+          DIST=""
+          case "${V}" in *-*) DIST="--tag next";; esac
+          [ -n "${DIST}" ] && echo "prerelease ${V}: publishing under 'next', not 'latest'."
+
+          if npm publish --access public --provenance ${DIST}; then
             echo "published via OIDC trusted publishing."
             exit 0
           fi
@@ -288,7 +303,7 @@ jobs:
           cat > "${RUNNER_TEMP}/.npmrc" <<EOF
           //registry.npmjs.org/:_authToken=${NPM_PUBLISHER}
           EOF
-          npm publish --access public --provenance --userconfig "${RUNNER_TEMP}/.npmrc"
+          npm publish --access public --provenance ${DIST} --userconfig "${RUNNER_TEMP}/.npmrc"
           rm -f "${RUNNER_TEMP}/.npmrc"
 
       - name: Create GitHub Release for the pushed tag
