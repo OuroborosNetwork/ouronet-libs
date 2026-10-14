@@ -2,12 +2,23 @@ name: Publish to npmjs.org
 
 # Triggered by pushing a version tag (e.g. v4.3.6).
 #
-# Smart per-package publish (same pattern as stoa-js, trimmed to this repo's two
-# packages). A tag `vX.Y.Z` publishes whichever package's package.json version
-# equals X.Y.Z:
+# Smart per-package publish. A tag `vX.Y.Z` publishes whichever package's
+# package.json version equals X.Y.Z:
 #
-#   - @ouronet/ouronet-core   (4.x — Ouronet protocol business logic)
-#   - @ouronet/ouronet-codex  (independent 0.x semver — React Codex layer)
+#   - @ouronet/ouronet-core    (5.x — Ouronet protocol business logic)
+#   - @ouronet/ouronet-codex   (independent 0.x semver — React Codex layer)
+#   - @ouronet/talos-registry  (2.x — the generated callable surface)
+#
+# AUTHENTICATION IS OIDC TRUSTED PUBLISHING, NOT A TOKEN. npmjs.com trusts this
+# repository + this workflow filename directly, so there is no NPM_TOKEN secret
+# to leak, rotate or let expire — which is exactly how the previous publisher
+# token died. Two consequences worth knowing:
+#
+#   * `npm` must be >= 11.5.1. `setup-node` still ships npm 10.x with Node 22,
+#     so the upgrade step below is REQUIRED, not hygiene: without it npm falls
+#     back to looking for a token and the publish fails with a 404.
+#   * The trusted publisher on npmjs.com is pinned to THIS FILENAME. Renaming
+#     this file silently breaks publishing until the connection is recreated.
 #
 # The two carry independent version lines, so a release is normally ONE tag for
 # ONE package (v4.3.6 → ouronet-core; v0.5.7 → ouronet-codex). At least one
@@ -41,18 +52,13 @@ jobs:
           node-version: 22
           cache: npm
 
-      # Explicit root .npmrc. Both scopes point at public npmjs: @ouronet is what
-      # we publish, @stoachain is what we INSTALL (stoa-core / kadena-stoic-legacy).
-      - name: Write .npmrc with auth token
+      # TRUSTED PUBLISHING NEEDS npm >= 11.5.1, and Node 22 ships 10.x. Without
+      # this the publish steps below look for an auth token that no longer
+      # exists and fail with a 404 that reads like a missing package.
+      - name: Upgrade npm (OIDC trusted publishing support)
         run: |
-          cat > .npmrc <<EOF
-          //registry.npmjs.org/:_authToken=${{ secrets.NPM_PUBLISHER }}
-          @ouronet:registry=https://registry.npmjs.org
-          @stoachain:registry=https://registry.npmjs.org
-          always-auth=true
-          EOF
-          echo "--- .npmrc structure (token redacted) ---"
-          sed 's|=.*|=***|' .npmrc
+          npm install -g npm@latest
+          echo "npm $(npm --version)"
 
       - name: Install dependencies
         run: npm install --prefer-offline --no-audit --no-fund
@@ -71,23 +77,27 @@ jobs:
           TAG_VERSION="${GITHUB_REF#refs/tags/v}"
           CORE_VERSION=$(node -p "require('./packages/ouronet-core/package.json').version")
           CODEX_VERSION=$(node -p "require('./packages/ouronet-codex/package.json').version")
-          echo "Tag: $TAG_VERSION | ouronet-core: $CORE_VERSION | ouronet-codex: $CODEX_VERSION"
+          TALOS_VERSION=$(node -p "require('./packages/talos-registry/package.json').version")
+          echo "Tag: $TAG_VERSION | ouronet-core: $CORE_VERSION | ouronet-codex: $CODEX_VERSION | talos-registry: $TALOS_VERSION"
 
-          PUBLISH_CORE="false"; PUBLISH_CODEX="false"
-          [ "$TAG_VERSION" = "$CORE_VERSION" ] && PUBLISH_CORE="true"
+          PUBLISH_CORE="false"; PUBLISH_CODEX="false"; PUBLISH_TALOS="false"
+          [ "$TAG_VERSION" = "$CORE_VERSION" ]  && PUBLISH_CORE="true"
           [ "$TAG_VERSION" = "$CODEX_VERSION" ] && PUBLISH_CODEX="true"
+          [ "$TAG_VERSION" = "$TALOS_VERSION" ] && PUBLISH_TALOS="true"
 
-          if [ "$PUBLISH_CORE" = "false" ] && [ "$PUBLISH_CODEX" = "false" ]; then
-            echo "::error::Tag $TAG_VERSION matches neither package (ouronet-core=$CORE_VERSION, ouronet-codex=$CODEX_VERSION)."
+          if [ "$PUBLISH_CORE" = "false" ] && [ "$PUBLISH_CODEX" = "false" ] && [ "$PUBLISH_TALOS" = "false" ]; then
+            echo "::error::Tag $TAG_VERSION matches no package (ouronet-core=$CORE_VERSION, ouronet-codex=$CODEX_VERSION, talos-registry=$TALOS_VERSION)."
             exit 1
           fi
 
           echo "PUBLISH_OURONET_CORE=$PUBLISH_CORE"   >> "$GITHUB_OUTPUT"
           echo "PUBLISH_OURONET_CODEX=$PUBLISH_CODEX" >> "$GITHUB_OUTPUT"
+          echo "PUBLISH_TALOS_REGISTRY=$PUBLISH_TALOS" >> "$GITHUB_OUTPUT"
           echo "TAG_VERSION=$TAG_VERSION"             >> "$GITHUB_OUTPUT"
           echo "── Publish queue ──"
-          echo "  @ouronet/ouronet-core:  $PUBLISH_CORE"
-          echo "  @ouronet/ouronet-codex: $PUBLISH_CODEX"
+          echo "  @ouronet/ouronet-core:   $PUBLISH_CORE"
+          echo "  @ouronet/ouronet-codex:  $PUBLISH_CODEX"
+          echo "  @ouronet/talos-registry: $PUBLISH_TALOS"
 
       # Each queued package's own README + CHANGELOG must reference the shipping
       # version — they're what npmjs.com renders.
@@ -97,6 +107,22 @@ jobs:
           QUEUED=()
           [ "${{ steps.queue.outputs.PUBLISH_OURONET_CORE }}"  = "true" ] && QUEUED+=("packages/ouronet-core")
           [ "${{ steps.queue.outputs.PUBLISH_OURONET_CODEX }}" = "true" ] && QUEUED+=("packages/ouronet-codex")
+
+          # talos-registry is checked on its CHANGELOG only, and deliberately.
+          # Its README is a generated-surface reference, not a release log: the
+          # version appears as "**This build:** N entrypoints ... surface `hash`",
+          # and every figure in it is already asserted against the bundled
+          # snapshot by the package's own `tests/readme.test.ts` -- which is what
+          # caught a stale surface hash on 2026-10-14. Forcing it into the
+          # core/codex "## Status" shape would add a second, weaker check of
+          # something a real test already covers.
+          if [ "${{ steps.queue.outputs.PUBLISH_TALOS_REGISTRY }}" = "true" ]; then
+            FIRST=$(grep -m1 '^## ' packages/talos-registry/CHANGELOG.md)
+            if ! echo "$FIRST" | grep -qE "^## ${TAG_VERSION}[[:space:]]"; then
+              echo "::error::packages/talos-registry/CHANGELOG.md first heading is not ${TAG_VERSION} (found: ${FIRST})"; exit 1
+            fi
+            echo "✓ @ouronet/talos-registry CHANGELOG references ${TAG_VERSION}"
+          fi
 
           for PKG_DIR in "${QUEUED[@]}"; do
             PKG_NAME=$(node -p "require('./${PKG_DIR}/package.json').name")
@@ -114,8 +140,10 @@ jobs:
             echo "✓ ${PKG_NAME} docs reference ${TAG_VERSION}"
           done
 
-      - name: Verify npm auth
-        run: npm whoami || echo "::warning::whoami failed — publish may too"
+      # NO `npm whoami` STEP. Under trusted publishing there is no logged-in
+      # user to report -- the OIDC exchange happens inside `npm publish` itself.
+      # The old step ran `whoami || warn`, which under OIDC warns on every single
+      # green run and trains everyone to ignore it.
 
       # Order: ouronet-core before ouronet-codex (codex peer-deps core).
       # Idempotent: skip when the version is already on the registry.
@@ -161,6 +189,16 @@ jobs:
             sleep 30
           done
           echo "::warning::Could not confirm the dist-tag within 3 minutes. The publish itself succeeded; verify 'npm view @ouronet/ouronet-codex dist-tags' once the registry catches up."
+
+      - name: Publish @ouronet/talos-registry
+        if: steps.queue.outputs.PUBLISH_TALOS_REGISTRY == 'true'
+        run: |
+          V="${{ steps.queue.outputs.TAG_VERSION }}"
+          if npm view @ouronet/talos-registry@${V} version >/dev/null 2>&1; then
+            echo "@ouronet/talos-registry@${V} already on npm — skipping (idempotent)."
+          else
+            npm publish --workspace=@ouronet/talos-registry --access public --provenance
+          fi
 
       - name: Create GitHub Release for the pushed tag
         env:

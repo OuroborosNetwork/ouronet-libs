@@ -24,6 +24,7 @@
   "scripts": {
     "sync": "node scripts/sync-registry.mjs",
     "build": "npm run sync && tsc -p tsconfig.build.json",
+    "build:ci": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",

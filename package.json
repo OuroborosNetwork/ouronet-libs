@@ -11,7 +11,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace=@ouronet/ouronet-core && npm run build --workspace=@ouronet/ouronet-codex",
+    "build": "npm run build --workspace=@ouronet/ouronet-core && npm run build --workspace=@ouronet/ouronet-codex && npm run build:ci --workspace=@ouronet/talos-registry",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces",
     "test:watch": "npm run test:watch --workspaces",
