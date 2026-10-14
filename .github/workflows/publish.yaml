@@ -65,6 +65,14 @@ jobs:
           npm install -g npm@latest
           echo "npm $(npm --version)"
 
+      - name: OIDC preflight (does this runner have an id-token to exchange?)
+        run: |
+          echo "npm            : $(npm --version)"
+          echo "ID token URL   : ${ACTIONS_ID_TOKEN_REQUEST_URL:+present}${ACTIONS_ID_TOKEN_REQUEST_URL:-ABSENT}"
+          echo "ID token value : ${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+present}${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-ABSENT}"
+          echo "repo           : ${GITHUB_REPOSITORY}"
+          echo "workflow ref   : ${GITHUB_WORKFLOW_REF}"
+
       - name: Install dependencies
         run: npm install --prefer-offline --no-audit --no-fund
 
@@ -153,23 +161,25 @@ jobs:
       # Order: ouronet-core before ouronet-codex (codex peer-deps core).
       # Idempotent: skip when the version is already on the registry.
       - name: Publish @ouronet/ouronet-core
+        working-directory: packages/ouronet-core
         if: steps.queue.outputs.PUBLISH_OURONET_CORE == 'true'
         run: |
           V="${{ steps.queue.outputs.TAG_VERSION }}"
           if npm view @ouronet/ouronet-core@${V} version >/dev/null 2>&1; then
             echo "@ouronet/ouronet-core@${V} already on npm — skipping (idempotent)."
           else
-            npm publish --workspace=@ouronet/ouronet-core --access public --provenance
+            npm publish --access public --provenance
           fi
 
       - name: Publish @ouronet/ouronet-codex
+        working-directory: packages/ouronet-codex
         if: steps.queue.outputs.PUBLISH_OURONET_CODEX == 'true'
         run: |
           V="${{ steps.queue.outputs.TAG_VERSION }}"
           if npm view @ouronet/ouronet-codex@${V} version >/dev/null 2>&1; then
             echo "@ouronet/ouronet-codex@${V} already on npm — skipping publish."
           else
-            npm publish --workspace=@ouronet/ouronet-codex --access public --provenance
+            npm publish --access public --provenance
           fi
 
           # `npm publish` already points `latest` at this version. This step
@@ -196,13 +206,14 @@ jobs:
           echo "::warning::Could not confirm the dist-tag within 3 minutes. The publish itself succeeded; verify 'npm view @ouronet/ouronet-codex dist-tags' once the registry catches up."
 
       - name: Publish @ouronet/talos-registry
+        working-directory: packages/talos-registry
         if: steps.queue.outputs.PUBLISH_TALOS_REGISTRY == 'true'
         run: |
           V="${{ steps.queue.outputs.TAG_VERSION }}"
           if npm view @ouronet/talos-registry@${V} version >/dev/null 2>&1; then
             echo "@ouronet/talos-registry@${V} already on npm — skipping (idempotent)."
           else
-            npm publish --workspace=@ouronet/talos-registry --access public --provenance
+            npm publish --access public --provenance
           fi
 
       - name: Create GitHub Release for the pushed tag
