@@ -8,7 +8,7 @@
  *
  * Pact functions:
  *   INFO    — (ouronet-ns.CODEX.CODEX|INFO_ReleaseStoicTag patron tag-name)
- *   EXECUTE — (ouronet-ns.TS01-C4.CODEX|C_ReleaseStoicTag patron tag-name)
+ *   EXECUTE — (ouronet-ns.TS01-C4.CODEX|C_ReleaseStoicTag patron executor tag-name)
  *
  * Cost: IGNIS only — 1 per glyph of the tag (surfaced by INFO).
  */
@@ -275,6 +275,14 @@ export default function ReleaseStoicTagModal({
 
       const pactCode = buildReleaseStoicTagPactCode({
         patron:  patronAccount.address,
+        // THE BOUND ACCOUNT, NOT THE PATRON. `C_ReleaseStoicTag` takes
+        // (patron executor tag-name) on chain and enforces OWNERSHIP of
+        // <executor> -- which is `account`, the one this modal already makes
+        // sign (its guard, or its AuthPathZone branch for a Smart account).
+        // Omitting it did not fail loudly: Pact PARTIALLY APPLIES a short call
+        // and yields a closure, so the transaction returned "Evaluation did not
+        // reduce to a value" rather than naming the missing argument.
+        executor: account.address,
         tagName,
       });
 
