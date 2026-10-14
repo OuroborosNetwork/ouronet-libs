@@ -94,7 +94,11 @@ jobs:
           echo "exchange HTTP ${CODE}"
           sed -E 's/"token":"[^"]*"/"token":"***"/g' /tmp/exchange.json || true
           echo
-          if [ "${CODE}" = "200" ]; then
+          # 201 Created, not 200 -- the exchange MINTS a token. Checking for 200
+          # reported a successful match as a failure, which is the same class of
+          # mistake as the filename: a check that is confidently wrong is worse
+          # than no check, because it is believed.
+          if [ "${CODE}" = "201" ] || [ "${CODE}" = "200" ]; then
             echo "::notice::Trusted publisher MATCHES — a real publish will go out over OIDC."
           else
             echo "::warning::Trusted publisher did NOT match (HTTP ${CODE}). Compare the ref below"
