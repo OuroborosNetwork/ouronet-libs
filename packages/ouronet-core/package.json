@@ -1,6 +1,6 @@
 {
   "name": "@ouronet/ouronet-core",
-  "version": "5.3.0",
+  "version": "5.3.1",
   "description": "Ouronet-specific business logic for the Ouronet protocol on StoaChain \u2014 interactions/* read+execute functions for the ouronet-ns Pact modules, the Codex encrypted-multi-wallet format, Ouronet protocol accounts and tokens. Depends on @stoachain/stoa-core for chain-generic infrastructure (signing, wallet, crypto, network, etc.).",
   "type": "module",
   "main": "./dist/index.js",

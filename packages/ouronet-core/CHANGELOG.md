@@ -4,6 +4,35 @@ All notable changes to `@ouronet/ouronet-core`.
 
 This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3.3.8. v4.0.0 split it into a two-package npm workspace under `StoaChain/stoa-js` — chain-generic infrastructure moved out into [`@stoachain/stoa-core`](https://www.npmjs.com/package/@stoachain/stoa-core), this package retained the Ouronet-specific business logic. The `4.0.0` heading below is the first release after the split.
 
+## 5.3.1 — 2026-10-15
+
+### A 59th transposed `INFO_` name, and a test so there is no 60th
+
+5.3.0 fixed 58 occurrences of `<MODULE>|INFO_<Op>` where the deployed readers are named
+`INFO_<MODULE>|<Op>`. One survived, in `ouroAccountFunctions.ts`, and was found only by
+grepping the PUBLISHED tarball after release:
+
+    CODEX.CODEX|INFO_RegisterStoicTag   ->  "Module ouronet-ns.CODEX has no such member"
+    CODEX.INFO_CODEX|RegisterStoicTag   ->  success
+
+Both probed against mainnet. It survived the sweep because that sweep was scoped to the
+files carrying `INFO-ONE` previews, and this one calls a different module.
+
+The transposition is easy to make and invisible once made: every OTHER function in the
+system reads `<MODULE>|<Op>`, so the CORRECT form is the one that looks wrong. And the
+failure is silent by construction -- the call returns `{status: "failure"}`, the helper
+swallows it in a `catch` and returns `null`, and the UI renders a permanent "Awaiting
+computation..." with Free/Free beside it. Nothing throws, nothing logs, no test fails.
+
+`tests/info-name-order.test.ts` now rejects any `|INFO_` in `src/`, matching the DEFECT
+rather than enumerating the correct names, so a preview reader added tomorrow is covered
+without an edit. It is structural rather than behavioural because telling the two
+spellings apart otherwise requires a live chain, and what is being prevented is a typo
+that produces a syntactically valid, successfully-parsed, forever-null call. A second
+spec pins that real `INFO_` calls exist, so the absence-assertion cannot pass vacuously.
+
+Non-breaking. **937 specs pass.**
+
 ## 5.3.0 — 2026-10-15
 
 ### Gas limits now calibrate in BOTH directions

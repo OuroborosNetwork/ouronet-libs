@@ -86,7 +86,7 @@ export async function getRegisterStoicTagInfo(
   try {
     const pactCode =
       `(let*` +
-      `  ((info (${KADENA_NAMESPACE}.CODEX.CODEX|INFO_RegisterStoicTag "${patron}" "${tagName}" "${account}"))` +
+      `  ((info (${KADENA_NAMESPACE}.CODEX.INFO_CODEX|RegisterStoicTag "${patron}" "${tagName}" "${account}"))` +
       `   (receivers (map (${KADENA_NAMESPACE}.DALOS.UR_AccountKadena) (at "kadena-targets" (at "kadena" info)))))` +
       `  { "info": info, "receivers": receivers })`;
     const response = await pactRead(pactCode, { tier: "T5" });
