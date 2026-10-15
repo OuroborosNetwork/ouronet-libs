@@ -81,31 +81,51 @@ jobs:
           echo "repo           : ${GITHUB_REPOSITORY}"
           echo "workflow ref   : ${GITHUB_WORKFLOW_REF}"
 
-      - name: OIDC exchange probe (does the trusted publisher actually match?)
+      # PROBE EVERY PACKAGE, NOT ONE OF THEM.
+      #
+      # This probed `@ouronet/talos-registry` only, hardcoded. On 2026-10-15 it reported
+      # "Trusted publisher MATCHES" and the run then failed publishing
+      # `@ouronet/ouronet-core` with `E404 ... PUT .../@ouronet%2fouronet-core`. Both
+      # statements were true: npm trusted publishing is configured PER PACKAGE, so a
+      # match for one package says nothing about another in the same repo, published by
+      # the same workflow, over the same OIDC identity.
+      #
+      # That is the same failure this probe was added to prevent, one level over -- the
+      # step's own comment says "a probe that lives anywhere else proves nothing about
+      # this one", and a probe for a different PACKAGE proves just as little. It now
+      # walks all three and prints a verdict per package, so a missing connection names
+      # itself instead of being reported as a green check for its neighbour.
+      - name: OIDC exchange probe (does each package's trusted publisher match?)
         run: |
           set -o pipefail
-          PKG="@ouronet%2ftalos-registry"
           TOK=$(curl -sS -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
                 "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm%3Aregistry.npmjs.org" \
                 | python3 -c 'import sys,json;print(json.load(sys.stdin)["value"])')
-          CODE=$(curl -sS -o /tmp/exchange.json -w '%{http_code}' -X POST \
-                 -H "Authorization: Bearer ${TOK}" -H "Content-Type: application/json" \
-                 "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${PKG}")
-          echo "exchange HTTP ${CODE}"
-          sed -E 's/"token":"[^"]*"/"token":"***"/g' /tmp/exchange.json || true
-          echo
-          # 201 Created, not 200 -- the exchange MINTS a token. Checking for 200
-          # reported a successful match as a failure, which is the same class of
-          # mistake as the filename: a check that is confidently wrong is worse
-          # than no check, because it is believed.
-          if [ "${CODE}" = "201" ] || [ "${CODE}" = "200" ]; then
-            echo "::notice::Trusted publisher MATCHES — a real publish will go out over OIDC."
-          else
-            echo "::warning::Trusted publisher did NOT match (HTTP ${CODE}). Compare the ref below"
-            echo "::warning::with the connection on npmjs.com, filename extension included:"
+          MISSING=0
+          for PKG in "@ouronet%2fouronet-core" "@ouronet%2fouronet-codex" "@ouronet%2ftalos-registry"; do
+            CODE=$(curl -sS -o /tmp/exchange.json -w '%{http_code}' -X POST \
+                   -H "Authorization: Bearer ${TOK}" -H "Content-Type: application/json" \
+                   "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${PKG}")
+            # 201 Created, not 200 -- the exchange MINTS a token. Checking for 200
+            # reported a successful match as a failure, which is the same class of
+            # mistake as the filename: a check that is confidently wrong is worse
+            # than no check, because it is believed.
+            if [ "${CODE}" = "201" ] || [ "${CODE}" = "200" ]; then
+              echo "::notice::${PKG} -- trusted publisher MATCHES (HTTP ${CODE})"
+            else
+              MISSING=1
+              echo "::warning::${PKG} -- NO trusted publisher (HTTP ${CODE})."
+              echo "::warning::  Add one on npmjs.com for THIS package: GitHub Actions,"
+              echo "::warning::  repo OuroborosNetwork/ouronet-libs, workflow publish.yml, no environment."
+            fi
+            rm -f /tmp/exchange.json
+          done
+          # Advisory on a dispatch (the probe IS the point); on a tag the publish step
+          # below reports the authoritative result, so this stays non-fatal either way.
+          if [ "${MISSING}" = "1" ]; then
+            echo "::warning::Workflow ref for comparison, filename extension included:"
             echo "::warning::  ${GITHUB_WORKFLOW_REF}"
           fi
-          rm -f /tmp/exchange.json
 
       - name: Install dependencies
         if: github.ref_type == 'tag'
