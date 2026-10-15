@@ -41,7 +41,7 @@ export async function checkUrStoaAccountExists(address: string): Promise<boolean
 
 /**
  * Get INFO for UnwrapUrStoa function.
- * (ouronet-ns.INFO-ONE.LIQUID|INFO_UnwrapUrStoa <patron> <wrapper> <amount:decimal>)
+ * (ouronet-ns.INFO-ONE.INFO_LIQUID|UnwrapUrStoa <patron> <wrapper> <amount:decimal>)
  */
 export async function getUnwrapUrStoaInfo(
   patron: string,
@@ -50,7 +50,7 @@ export async function getUnwrapUrStoaInfo(
 ): Promise<any | null> {
   try {
     const decimalAmount = formatDecimalForPact(amount);
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.LIQUID|INFO_UnwrapUrStoa "${patron}" "${wrapper}" ${decimalAmount})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_LIQUID|UnwrapUrStoa "${patron}" "${wrapper}" ${decimalAmount})`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (response?.result?.status === "success") {
       return (response.result as any).data;

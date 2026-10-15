@@ -349,7 +349,7 @@ async function executeLiquidityOp(opts: LiquidityOpInput): Promise<any> {
     transaction = buildTransaction(actualGasLimit);
   } else {
     const requiredGas = simulation.gas;
-    if (requiredGas && requiredGas > defaultGasLimit) {
+    if (requiredGas) {
       transaction = buildTransaction(calculateAutoGasLimit(requiredGas));
     }
   }
@@ -432,7 +432,28 @@ export async function executeAddLiquidity(
 }
 
 /**
- * Execute special LP type add liquidity (Iced, Glacial, Frozen, Sleeping)
+ * Execute special LP type add liquidity (Iced, Glacial, Frozen, Sleeping).
+ *
+ * TARGETS `TS01-C3`, NOT `TS01-CP` — corrected 2026-10-15, and the difference is not cosmetic.
+ * Both Talos modules expose all five `SWP|C_Add…Liquidity` names, but they route elsewhere:
+ *
+ *   · `TS01-C3` → `SWPLC::STOA-PID|C_Add…Liquidity` — ONE transaction, start to finish.
+ *   · `TS01-CP` → `MTX-SWP::C_Add…Liquidity`, whose own `@doc` calls it a *"Multi-transaction
+ *     door"*, opening the `MTX|C_AddLiquidity` DEFPACT.
+ *
+ * This function has always been called the same way as `executeAddLiquidity` — a single
+ * `executeLiquidityOp` with no continuation handling — while `executeAddLiquidity` targets
+ * `TS01-C3` and this one targeted `TS01-CP`. Firing a defpact starter and never continuing it
+ * strands the LP minted by step 1 in `SWP|SC_NAME`, because step 2 is what transfers it to the
+ * account. That is an active cause of stranded pool LP, not a latent one.
+ *
+ * It is also what this package already decided. `executeAddLiquidity`'s own header, forty lines
+ * up, records that the multi-step wrappers were REMOVED — *"The Pact-side multi-step contract
+ * still exists on chain (`TS01-CP.SWP|C_AddStandardLiquidity` defpact with continuation steps)
+ * — preserved for historical interoperability. This package just stops exposing the TypeScript
+ * wrappers around it because no consumer needs them any more."* That sweep missed this
+ * function, which went on calling the module the sweep had just retired. So this is not a
+ * change of policy; it is the policy, applied to the one place that escaped it.
  */
 export async function executeSpecialAddLiquidity(
   params: AddLiquidityParams,
@@ -447,10 +468,10 @@ export async function executeSpecialAddLiquidity(
     let pactCode: string;
     switch (specialParams.type) {
       case "iced":
-        pactCode = `(${KADENA_NAMESPACE}.TS01-CP.SWP|C_AddIcedLiquidity "${params.patronKeypair.address}" "${params.account}" "${params.swpair}" ${pactInputAmounts})`;
+        pactCode = `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_AddIcedLiquidity "${params.patronKeypair.address}" "${params.account}" "${params.swpair}" ${pactInputAmounts})`;
         break;
       case "glacial":
-        pactCode = `(${KADENA_NAMESPACE}.TS01-CP.SWP|C_AddGlacialLiquidity "${params.patronKeypair.address}" "${params.account}" "${params.swpair}" ${pactInputAmounts})`;
+        pactCode = `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_AddGlacialLiquidity "${params.patronKeypair.address}" "${params.account}" "${params.swpair}" ${pactInputAmounts})`;
         break;
       case "frozen": {
         if (!specialParams.frozenDptf) {
@@ -459,14 +480,14 @@ export async function executeSpecialAddLiquidity(
         // Frozen liquidity uses a single input amount, not the array.
         const frozenAmount = params.inputAmounts[0] || 0;
         const frozenAmountStr = frozenAmount.toString().includes('.') ? frozenAmount.toString() : `${frozenAmount}.0`;
-        pactCode = `(${KADENA_NAMESPACE}.TS01-CP.SWP|C_AddFrozenLiquidity "${params.patronKeypair.address}" "${params.account}" "${params.swpair}" "${specialParams.frozenDptf}" ${frozenAmountStr})`;
+        pactCode = `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_AddFrozenLiquidity "${params.patronKeypair.address}" "${params.account}" "${params.swpair}" "${specialParams.frozenDptf}" ${frozenAmountStr})`;
         break;
       }
       case "sleeping":
         if (!specialParams.sleepingDpmf || specialParams.nonce === undefined) {
           throw new Error("sleepingDpmf and nonce parameters required for sleeping liquidity");
         }
-        pactCode = `(${KADENA_NAMESPACE}.TS01-CP.SWP|C_AddSleepingLiquidity "${params.patronKeypair.address}" "${params.account}" "${params.swpair}" "${specialParams.sleepingDpmf}" ${specialParams.nonce})`;
+        pactCode = `(${KADENA_NAMESPACE}.TS01-C3.SWP|C_AddSleepingLiquidity "${params.patronKeypair.address}" "${params.account}" "${params.swpair}" "${specialParams.sleepingDpmf}" ${specialParams.nonce})`;
         break;
       default:
         throw new Error(`Unsupported special LP type: ${specialParams.type}`);

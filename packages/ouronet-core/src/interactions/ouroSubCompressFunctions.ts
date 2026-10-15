@@ -78,10 +78,24 @@ export async function sublimateOuroToIgnis(
     throw error;
   }
 
-  // Check if we need to adjust gas limit
+  // CALIBRATE IN BOTH DIRECTIONS, NOT JUST UPWARD.
+  //
+  // This read `requiredGas > gasLimit`, so the rebuild fired ONLY when the simulated cost
+  // EXCEEDED the starting limit. With a starting limit of 2_000_000 -- the node ceiling, which
+  // a simulation can never exceed and still succeed -- the condition was unreachable and
+  // `calculateAutoGasLimit` was dead code. Every such transaction shipped at the full ceiling.
+  //
+  // That is only invisible while transactions succeed. A SUCCEEDING transaction is charged what
+  // it USES; a FAILING one is charged its LIMIT. So the entire 2M was burnt on every failure,
+  // instead of the ~170k a 145k operation calibrates to -- reported from the field 2026-10-15.
+  //
+  // Calibrating down is safe by construction: `calculateAutoGasLimit` is purpose-built for it,
+  // applying a tiered multiplier plus a flat cushion (x1.10 + 10k in the 100k-500k band)
+  // precisely because a dirty read under-reports a signed transaction's real cost, and it
+  // clamps to the node limit and a minimum floor at both ends. Eighteen other call sites in
+  // this package already use it unconditionally.
   const requiredGas = simulation.gas;
-  if (requiredGas && requiredGas > gasLimit) {
-    // Rebuild transaction with adjusted gas limit (20% buffer)
+  if (requiredGas) {
     gasLimit = calculateAutoGasLimit(requiredGas);
     transaction = buildTransaction(gasLimit);
   }
@@ -162,10 +176,24 @@ export async function compressIgnisToOuro(
     throw new Error(`Simulation failed: ${errorMessage}`);
   }
 
-  // Check if we need to adjust gas limit
+  // CALIBRATE IN BOTH DIRECTIONS, NOT JUST UPWARD.
+  //
+  // This read `requiredGas > gasLimit`, so the rebuild fired ONLY when the simulated cost
+  // EXCEEDED the starting limit. With a starting limit of 2_000_000 -- the node ceiling, which
+  // a simulation can never exceed and still succeed -- the condition was unreachable and
+  // `calculateAutoGasLimit` was dead code. Every such transaction shipped at the full ceiling.
+  //
+  // That is only invisible while transactions succeed. A SUCCEEDING transaction is charged what
+  // it USES; a FAILING one is charged its LIMIT. So the entire 2M was burnt on every failure,
+  // instead of the ~170k a 145k operation calibrates to -- reported from the field 2026-10-15.
+  //
+  // Calibrating down is safe by construction: `calculateAutoGasLimit` is purpose-built for it,
+  // applying a tiered multiplier plus a flat cushion (x1.10 + 10k in the 100k-500k band)
+  // precisely because a dirty read under-reports a signed transaction's real cost, and it
+  // clamps to the node limit and a minimum floor at both ends. Eighteen other call sites in
+  // this package already use it unconditionally.
   const requiredGas = simulation.gas;
-  if (requiredGas && requiredGas > gasLimit) {
-    // Rebuild transaction with adjusted gas limit (20% buffer)
+  if (requiredGas) {
     gasLimit = calculateAutoGasLimit(requiredGas);
     transaction = buildTransaction(gasLimit);
   }
@@ -260,7 +288,7 @@ export async function getCompressInfo(
 ): Promise<any | null> {
   try {
     const decimalAmount = formatDecimalForPact(amount);
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.ORBR|INFO_Compress "${client}" ${decimalAmount})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_ORBR|Compress "${client}" ${decimalAmount})`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (response?.result?.status === "success") return (response.result as any).data;
     return null;

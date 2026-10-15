@@ -59,7 +59,7 @@ export async function checkCoinAccountExists(address: string): Promise<boolean |
 
 /**
  * Get INFO for UnwrapStoa function.
- * (ouronet-ns.INFO-ONE.LIQUID|INFO_UnwrapStoa <patron> <unwrapper> <amount:decimal>)
+ * (ouronet-ns.INFO-ONE.INFO_LIQUID|UnwrapStoa <patron> <unwrapper> <amount:decimal>)
  */
 export async function getDPTFIssueInfo(
   patron: string,
@@ -68,7 +68,7 @@ export async function getDPTFIssueInfo(
 ): Promise<any | null> {
   try {
     const tokenList = tokens.map(t => `"${t}"`).join(" ");
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.DPTF|INFO_Issue "${patron}" "${resident}" [${tokenList}])`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_DPTF|Issue "${patron}" "${resident}" [${tokenList}])`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (response?.result?.status === "success") return (response.result as any).data;
     return null;

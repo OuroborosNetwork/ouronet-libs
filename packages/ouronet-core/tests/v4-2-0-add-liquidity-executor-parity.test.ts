@@ -25,6 +25,24 @@
  *    spy is required.
  */
 
+/**
+ * GOLDENS UPDATED TS01-CP -> TS01-C3, 2026-10-15.
+ *
+ * These four strings pinned `TS01-CP`, and the lock worked exactly as designed: it held the
+ * executor byte-stable across the Phase 3 consolidation. What it could not do is ask whether the
+ * byte-stable value was RIGHT, and it was not. `TS01-CP` routes to `MTX-SWP`, whose own Pact
+ * `@doc` calls it a *"Multi-transaction door"* onto the `MTX|C_AddLiquidity` defpact, while
+ * `executeSpecialAddLiquidity` fires one transaction and never continues a pact. Step 1 mints LP
+ * into `SWP|SC_NAME`; step 2 is what moves it to the account. So every special add-liquidity call
+ * made through this package stranded its own output.
+ *
+ * `executeAddLiquidity` in the same file targets `TS01-C3` — the single-transaction `SWPLC` path
+ * — and its header records that the multi-step wrappers were deliberately removed from this
+ * package. `executeSpecialAddLiquidity` was simply missed by that sweep, and this lock then froze
+ * the omission. A golden-string test inherits the correctness of whatever it captured, which is
+ * why one that was written to preserve behaviour should not be read as endorsing it.
+ */
+
 import { describe, it, expect, vi, beforeEach, afterEach, expectTypeOf } from "vitest";
 import { getLogger, setLogger, type Logger } from "@stoachain/stoa-core/observability";
 
@@ -148,11 +166,11 @@ describe("Strategy A — Pact-code golden-string lock", () => {
     );
   });
 
-  it("executeSpecialAddLiquidity (iced) emits the locked TS01-CP AddIcedLiquidity code", async () => {
+  it("executeSpecialAddLiquidity (iced) emits the locked TS01-C3 AddIcedLiquidity code", async () => {
     const special: SpecialLPParams = { type: "iced" };
     await executeSpecialAddLiquidity(baseAddLiquidityParams, special);
     expect(capturedCode).toBe(
-      `(ouronet-ns.TS01-CP.SWP|C_AddIcedLiquidity "k:abc" "Ouro.Test" "KDA:OURO" [1.5 2.5])`,
+      `(ouronet-ns.TS01-C3.SWP|C_AddIcedLiquidity "k:abc" "Ouro.Test" "KDA:OURO" [1.5 2.5])`,
     );
   });
 
@@ -177,7 +195,7 @@ describe("Strategy A — special-type Pact-code variants", () => {
   it("special:glacial emits the locked AddGlacialLiquidity code", async () => {
     await executeSpecialAddLiquidity(baseAddLiquidityParams, { type: "glacial" });
     expect(capturedCode).toBe(
-      `(ouronet-ns.TS01-CP.SWP|C_AddGlacialLiquidity "k:abc" "Ouro.Test" "KDA:OURO" [1.5 2.5])`,
+      `(ouronet-ns.TS01-C3.SWP|C_AddGlacialLiquidity "k:abc" "Ouro.Test" "KDA:OURO" [1.5 2.5])`,
     );
   });
 
@@ -187,7 +205,7 @@ describe("Strategy A — special-type Pact-code variants", () => {
       frozenDptf: "DPTF-id",
     });
     expect(capturedCode).toBe(
-      `(ouronet-ns.TS01-CP.SWP|C_AddFrozenLiquidity "k:abc" "Ouro.Test" "KDA:OURO" "DPTF-id" 1.5)`,
+      `(ouronet-ns.TS01-C3.SWP|C_AddFrozenLiquidity "k:abc" "Ouro.Test" "KDA:OURO" "DPTF-id" 1.5)`,
     );
   });
 
@@ -198,7 +216,7 @@ describe("Strategy A — special-type Pact-code variants", () => {
       nonce: 42,
     });
     expect(capturedCode).toBe(
-      `(ouronet-ns.TS01-CP.SWP|C_AddSleepingLiquidity "k:abc" "Ouro.Test" "KDA:OURO" "DPMF-id" 42)`,
+      `(ouronet-ns.TS01-C3.SWP|C_AddSleepingLiquidity "k:abc" "Ouro.Test" "KDA:OURO" "DPMF-id" 42)`,
     );
   });
 });

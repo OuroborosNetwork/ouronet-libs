@@ -7,7 +7,7 @@ import { Pact } from "@stoachain/kadena-stoic-legacy/client";
 import { getFailoverClient } from "@stoachain/stoa-core/network";
 import { pactRead } from "@stoachain/stoa-core/reads";
 import { formatDecimalForPact, safeCreationTime } from "@stoachain/stoa-core/pact";
-import { stoaGasMeta } from "@stoachain/stoa-core/gas";
+import { stoaGasMeta, calculateAutoGasLimit } from "@stoachain/stoa-core/gas";
 import { universalSignTransaction, fromKeypair } from "@stoachain/stoa-core/signing";
 import type { IKadenaKeypair } from "@stoachain/stoa-core/signing";
 export type { IKadenaKeypair } from "@stoachain/stoa-core/signing";
@@ -113,7 +113,7 @@ export async function getCoilPreviewGeneric(
   try {
     const decimalAmount = formatDecimalForPact(amount);
     
-    const executionString = `(${KADENA_NAMESPACE}.INFO-ONE.ATS|INFO_Coil "preview" "preview" "${config.atsPair}" "${config.sourceToken}" ${decimalAmount})`;
+    const executionString = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_ATS|Coil "preview" "preview" "${config.atsPair}" "${config.sourceToken}" ${decimalAmount})`;
     
     const response = await pactRead(executionString, { tier: "T2" });
     
@@ -244,12 +244,38 @@ export async function coilTokensGeneric(
     throw new Error(`Simulation failed: ${errorMessage}`);
   }
 
-  // Check if we need to adjust gas limit
+  // CALIBRATE IN BOTH DIRECTIONS, NOT JUST UPWARD.
+  //
+  // This read `requiredGas > gasLimit`, so the rebuild fired ONLY when the simulated cost
+  // EXCEEDED the starting limit. With a starting limit of 2_000_000 -- the node ceiling, which
+  // a simulation can never exceed and still succeed -- the condition was unreachable and
+  // `calculateAutoGasLimit` was dead code. Every such transaction shipped at the full ceiling.
+  //
+  // That is only invisible while transactions succeed. A SUCCEEDING transaction is charged what
+  // it USES; a FAILING one is charged its LIMIT. So the entire 2M was burnt on every failure,
+  // instead of the ~170k a 145k operation calibrates to -- reported from the field 2026-10-15.
+  //
+  // Calibrating down is safe by construction: `calculateAutoGasLimit` is purpose-built for it,
+  // applying a tiered multiplier plus a flat cushion (x1.10 + 10k in the 100k-500k band)
+  // precisely because a dirty read under-reports a signed transaction's real cost, and it
+  // clamps to the node limit and a minimum floor at both ends. Eighteen other call sites in
+  // this package already use it unconditionally.
+  // AND USE THE SHARED CALIBRATOR, NOT A HAND-ROLLED MULTIPLIER.
+  //
+  // This site had `Math.ceil(requiredGas * 1.2)`. While the rebuild was gated on exceeding
+  // 70_000 that was survivable, because it only ran for expensive coils where a flat 20% is
+  // a reasonable cushion. Making the rebuild unconditional (above) would have extended that
+  // flat multiplier to CHEAP coils, where it is far too thin and where the old 70_000 default
+  // had been acting as the safety net -- so the fix to one defect would have introduced
+  // another, in the direction of out-of-gas failures that also cost their whole limit.
+  //
+  // `calculateAutoGasLimit` is banded precisely for this: x10 below 100 gas, tapering to
+  // x1.05 + 20k at the top, with a minimum floor. Caught by this package's own
+  // `gas-limit-calibration` test, which requires every site that reads `simulation.gas` to
+  // calibrate through the shared function rather than its own arithmetic.
   const requiredGas = simulation.gas;
-  if (requiredGas && requiredGas > gasLimit) {
-    // Rebuild transaction with adjusted gas limit (20% buffer)
-    gasLimit = Math.ceil(requiredGas * 1.2);
-    // Gas limit adjusted based on simulation
+  if (requiredGas) {
+    gasLimit = calculateAutoGasLimit(requiredGas);
     transaction = buildTransaction(gasLimit);
   }
 

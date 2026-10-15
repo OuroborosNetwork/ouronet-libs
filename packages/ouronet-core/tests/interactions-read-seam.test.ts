@@ -110,9 +110,9 @@ const stub: PactReader = (pactCode, options) => {
     return Promise.resolve({ result: { status: "success", data: "k:abc" } });
   }
 
-  // INFO_WrapStoa / INFO_WrapUrStoa — getWrapStoaInfo / getWrapUrStoaInfo
+  // INFO_LIQUID|WrapStoa / INFO_LIQUID|WrapUrStoa — getWrapStoaInfo / getWrapUrStoaInfo
   // forward `(response.result as any).data` to the caller; an object suffices.
-  if (pactCode.includes("INFO_WrapStoa") || pactCode.includes("INFO_WrapUrStoa")) {
+  if (pactCode.includes("INFO_LIQUID|Wrap")) {
     return Promise.resolve({
       result: { status: "success", data: { ignis: "0.0", kadena: "0.0" } },
     });
@@ -198,7 +198,10 @@ describe("interactions read-seam regression guard (F-CORE-006)", () => {
     const out = await getWrapStoaInfo("patron", "wrapper", "1.0");
     expect(calls.length).toBeGreaterThanOrEqual(1);
     expect(calls[0].options?.tier).toBe("T2");
-    expect(calls[0].pactCode).toContain("INFO_WrapStoa");
+    // `INFO_LIQUID|WrapStoa`, NOT `LIQUID|INFO_WrapStoa`: mainnet answers "no such member"
+    // to the latter. This assertion matched a SUBSTRING of the broken name, so it passed
+    // for as long as the name was wrong and failed the moment it was fixed.
+    expect(calls[0].pactCode).toContain("INFO_LIQUID|WrapStoa");
     expect(out).toEqual({ ignis: "0.0", kadena: "0.0" });
   });
 
@@ -225,7 +228,7 @@ describe("interactions read-seam regression guard (F-CORE-006)", () => {
     const out = await getWrapUrStoaInfo("patron", "wrapper", "1.0");
     expect(calls.length).toBeGreaterThanOrEqual(1);
     expect(calls[0].options?.tier).toBe("T2");
-    expect(calls[0].pactCode).toContain("INFO_WrapUrStoa");
+    expect(calls[0].pactCode).toContain("INFO_LIQUID|WrapUrStoa");
     expect(out).toEqual({ ignis: "0.0", kadena: "0.0" });
   });
 

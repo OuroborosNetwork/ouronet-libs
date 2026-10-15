@@ -279,7 +279,7 @@ export async function kpayBuy(
 
   // 6. Adjust gas limit if needed
   const requiredGas = simulation.gas;
-  if (requiredGas && requiredGas > gasLimit) {
+  if (requiredGas) {
     gasLimit = calculateAutoGasLimit(requiredGas); // 20% buffer
     transaction = buildTransaction(gasLimit);
   }

@@ -60,7 +60,7 @@ export async function brumateWkdaToPkda(
   }
 
   const requiredGas = simulation.gas;
-  if (requiredGas && requiredGas > gasLimit) {
+  if (requiredGas) {
     gasLimit = calculateAutoGasLimit(requiredGas);
     transaction = buildTransaction(gasLimit);
   }
@@ -123,7 +123,7 @@ export async function constrictLkdaToPkda(
   }
 
   const requiredGas = simulation.gas;
-  if (requiredGas && requiredGas > gasLimit) {
+  if (requiredGas) {
     gasLimit = calculateAutoGasLimit(requiredGas);
     transaction = buildTransaction(gasLimit);
   }

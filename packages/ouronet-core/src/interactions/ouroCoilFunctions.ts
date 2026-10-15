@@ -44,7 +44,7 @@ export async function getCoilPreview(
   try {
     const decimalAmount = formatDecimalForPact(ouroAmount);
 
-    const response = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.ATS|INFO_Coil "preview" "preview" "Auryndex-O136CBn22ncY" "OURO-8Nh-JO8JO4F5" ${decimalAmount})`, { tier: "T2" });
+    const response = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.INFO_ATS|Coil "preview" "preview" "Auryndex-O136CBn22ncY" "OURO-8Nh-JO8JO4F5" ${decimalAmount})`, { tier: "T2" });
 
     if (!response || !response.result || response.result.status === "failure") {
       // v3.3.0 (closes part of F-LOGGER-SEAM-001): routed through getLogger().warn
@@ -165,10 +165,24 @@ export async function curlOuroToEliteAuryn(
     throw new Error(`Simulation failed: ${errorMessage}`);
   }
 
-  // Check if we need to adjust gas limit
+  // CALIBRATE IN BOTH DIRECTIONS, NOT JUST UPWARD.
+  //
+  // This read `requiredGas > gasLimit`, so the rebuild fired ONLY when the simulated cost
+  // EXCEEDED the starting limit. With a starting limit of 2_000_000 -- the node ceiling, which
+  // a simulation can never exceed and still succeed -- the condition was unreachable and
+  // `calculateAutoGasLimit` was dead code. Every such transaction shipped at the full ceiling.
+  //
+  // That is only invisible while transactions succeed. A SUCCEEDING transaction is charged what
+  // it USES; a FAILING one is charged its LIMIT. So the entire 2M was burnt on every failure,
+  // instead of the ~170k a 145k operation calibrates to -- reported from the field 2026-10-15.
+  //
+  // Calibrating down is safe by construction: `calculateAutoGasLimit` is purpose-built for it,
+  // applying a tiered multiplier plus a flat cushion (x1.10 + 10k in the 100k-500k band)
+  // precisely because a dirty read under-reports a signed transaction's real cost, and it
+  // clamps to the node limit and a minimum floor at both ends. Eighteen other call sites in
+  // this package already use it unconditionally.
   const requiredGas = simulation.gas;
-  if (requiredGas && requiredGas > gasLimit) {
-    // Rebuild transaction with adjusted gas limit (20% buffer)
+  if (requiredGas) {
     gasLimit = calculateAutoGasLimit(requiredGas);
     transaction = buildTransaction(gasLimit);
   }
@@ -267,10 +281,24 @@ export async function coilOuroToAuryn(
     throw new Error(`Simulation failed: ${errorMessage}`);
   }
 
-  // Check if we need to adjust gas limit
+  // CALIBRATE IN BOTH DIRECTIONS, NOT JUST UPWARD.
+  //
+  // This read `requiredGas > gasLimit`, so the rebuild fired ONLY when the simulated cost
+  // EXCEEDED the starting limit. With a starting limit of 2_000_000 -- the node ceiling, which
+  // a simulation can never exceed and still succeed -- the condition was unreachable and
+  // `calculateAutoGasLimit` was dead code. Every such transaction shipped at the full ceiling.
+  //
+  // That is only invisible while transactions succeed. A SUCCEEDING transaction is charged what
+  // it USES; a FAILING one is charged its LIMIT. So the entire 2M was burnt on every failure,
+  // instead of the ~170k a 145k operation calibrates to -- reported from the field 2026-10-15.
+  //
+  // Calibrating down is safe by construction: `calculateAutoGasLimit` is purpose-built for it,
+  // applying a tiered multiplier plus a flat cushion (x1.10 + 10k in the 100k-500k band)
+  // precisely because a dirty read under-reports a signed transaction's real cost, and it
+  // clamps to the node limit and a minimum floor at both ends. Eighteen other call sites in
+  // this package already use it unconditionally.
   const requiredGas = simulation.gas;
-  if (requiredGas && requiredGas > gasLimit) {
-    // Rebuild transaction with adjusted gas limit (20% buffer)
+  if (requiredGas) {
     gasLimit = calculateAutoGasLimit(requiredGas);
     transaction = buildTransaction(gasLimit);
   }

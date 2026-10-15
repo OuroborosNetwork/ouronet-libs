@@ -4,6 +4,51 @@ All notable changes to `@ouronet/ouronet-core`.
 
 This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3.3.8. v4.0.0 split it into a two-package npm workspace under `StoaChain/stoa-js` — chain-generic infrastructure moved out into [`@stoachain/stoa-core`](https://www.npmjs.com/package/@stoachain/stoa-core), this package retained the Ouronet-specific business logic. The `4.0.0` heading below is the first release after the split.
 
+## 5.3.0 — 2026-10-15
+
+### Gas limits now calibrate in BOTH directions
+
+Fourteen two-pass executors simulated for cost and then rebuilt the transaction with a calibrated
+limit — but only `if (requiredGas > gasLimit)`. Twelve of them started at `2_000_000`, which **is**
+the node ceiling: a simulation cannot exceed it and still succeed, so the branch was unreachable,
+`calculateAutoGasLimit` was dead code, and every such transaction shipped at the full ceiling.
+
+The comment above the branch read *"Rebuild transaction with adjusted gas limit (20% buffer)"* — the
+intent was always to calibrate **down**; the condition only permitted **up**.
+
+This is invisible while transactions succeed, because a succeeding transaction is charged what it
+**uses**. A failing one is charged its **limit**. So a 145,633-gas operation cost **2,000,000** on
+failure instead of the **170,197** it calibrates to — roughly 12x, on exactly the transactions a
+user least wants to pay for.
+
+All fourteen now calibrate unconditionally, matching the eighteen sites that already did.
+Calibrating down is safe by construction: `calculateAutoGasLimit` is banded (x10 below 100 gas,
+tapering to x1.05 + 20k at the top), keeps a minimum floor and clamps to the node limit — the
+cushion exists precisely because a dirty read under-reports a signed transaction's real cost.
+
+`coilFunctions` additionally moves off a hand-rolled `Math.ceil(requiredGas * 1.2)` onto the shared
+calibrator. Its guard (70,000) was genuinely live, so making the rebuild unconditional would have
+applied a flat 20% cushion to **cheap** coils, where it is far too thin and where the 70,000 default
+had been acting as the safety net — turning a fix for over-charging into out-of-gas failures, which
+cost their whole limit too. Caught by the new `gas-limit-calibration` test, not by review.
+
+Six specs lock it, including one that fails by filename if any site re-grows the comparison, and one
+requiring every file that reads `simulation.gas` to calibrate through the shared function rather
+than its own arithmetic.
+
+### INFO cost previews called a function that does not exist
+
+58 occurrences across 8 files built `MODULE|INFO_Op` where the deployed name is `INFO_MODULE|Op` —
+the two halves transposed. Probed against mainnet: *"Module ouronet-ns.INFO-ONE has no such
+member."*
+
+The helper swallowed the failure in a `catch` and returned `null`, which renders as a permanent
+"Awaiting computation…" with Free/Free beside it. Affects previews across **ATS, DPTF, LIQUID, ORBR,
+VST and SWP** — Coil, Cull, Brumate, Awake, Slumber, Wrap/Unwrap, Sublimate, Compress, Remove
+Liquidity, Change Ownership and Firestarter among them.
+
+Non-breaking — no exported signatures changed. **933 specs pass.**
+
 ## 5.2.0 — 2026-09-26
 
 ### `BundleProgress` now reports the gas its reads consumed

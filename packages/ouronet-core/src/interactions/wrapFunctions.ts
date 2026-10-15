@@ -22,7 +22,7 @@ import type { IKadenaKeypair } from "@stoachain/stoa-core/signing";
 
 // ─── INFO ─────────────────────────────────────────────────────────────────────
 /**
- * (ouronet-ns.INFO-ONE.LIQUID|INFO_WrapStoa <patron:string> <wrapper:string> <amount:decimal>)
+ * (ouronet-ns.INFO-ONE.INFO_LIQUID|WrapStoa <patron:string> <wrapper:string> <amount:decimal>)
  * Returns cost info: ignis, kadena, pre-text, post-text, etc.
  */
 export async function getWrapStoaInfo(
@@ -32,7 +32,7 @@ export async function getWrapStoaInfo(
 ): Promise<any | null> {
   try {
     const decimalAmount = formatDecimalForPact(amount);
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.LIQUID|INFO_WrapStoa "${patron}" "${wrapper}" ${decimalAmount})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_LIQUID|WrapStoa "${patron}" "${wrapper}" ${decimalAmount})`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (response?.result?.status === "success") {
       return (response.result as any).data;
@@ -200,7 +200,7 @@ export async function executeWrapStoa(params: WrapStoaParams): Promise<any> {
 
 // ─── INFO UrStoa ──────────────────────────────────────────────────────────────
 /**
- * (ouronet-ns.INFO-ONE.LIQUID|INFO_WrapUrStoa <patron:string> <wrapper:string> <amount:decimal>)
+ * (ouronet-ns.INFO-ONE.INFO_LIQUID|WrapUrStoa <patron:string> <wrapper:string> <amount:decimal>)
  * Returns cost info: ignis, kadena, pre-text, post-text, etc.
  */
 export async function getWrapUrStoaInfo(
@@ -210,7 +210,7 @@ export async function getWrapUrStoaInfo(
 ): Promise<any | null> {
   try {
     const decimalAmount = formatDecimalForPact(amount);
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.LIQUID|INFO_WrapUrStoa "${patron}" "${wrapper}" ${decimalAmount})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_LIQUID|WrapUrStoa "${patron}" "${wrapper}" ${decimalAmount})`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (response?.result?.status === "success") {
       return (response.result as any).data;

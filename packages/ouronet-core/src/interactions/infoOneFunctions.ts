@@ -32,7 +32,7 @@ export function parseTransferPreview(previewData: any): TransferPreviewData | nu
 
 /**
  * Get transfer preview information
- * (INFO-ONE.DPTF|INFO_Transfer patron id sender receiver transfer-amount)
+ * (INFO-ONE.INFO_DPTF|Transfer patron id sender receiver transfer-amount)
  */
 export async function getTransferPreview(
   patronAddress: string,
@@ -44,7 +44,7 @@ export async function getTransferPreview(
   try {
     const decimalAmount = formatDecimalForPact(amount);
     
-    const response = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.DPTF|INFO_Transfer "${patronAddress}" "${tokenId}" "${senderAddress}" "${receiverAddress}" ${decimalAmount})`, { tier: "T2" });
+    const response = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.INFO_DPTF|Transfer "${patronAddress}" "${tokenId}" "${senderAddress}" "${receiverAddress}" ${decimalAmount})`, { tier: "T2" });
 
     if (!response || !response.result || response.result.status === "failure") {
       return null;
@@ -59,7 +59,7 @@ export async function getTransferPreview(
 
 /**
  * Get coil preview information from INFO-ONE
- * (INFO-ONE.ATS|INFO_Coil patron coiler ats reward-token coil-amount)
+ * (INFO-ONE.INFO_ATS|Coil patron coiler ats reward-token coil-amount)
  */
 export async function getCoilPreviewInfo(
   patronAddress: string,
@@ -71,7 +71,7 @@ export async function getCoilPreviewInfo(
   try {
     const decimalAmount = formatDecimalForPact(amount);
     
-    const response = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.ATS|INFO_Coil "${patronAddress}" "${coilerAddress}" "${atsId}" "${rewardTokenId}" ${decimalAmount})`, { tier: "T2" });
+    const response = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.INFO_ATS|Coil "${patronAddress}" "${coilerAddress}" "${atsId}" "${rewardTokenId}" ${decimalAmount})`, { tier: "T2" });
 
     if (!response || !response.result || response.result.status === "failure") {
       return null;
@@ -86,7 +86,7 @@ export async function getCoilPreviewInfo(
 
 /**
  * Get curl preview information from INFO-ONE
- * (INFO-ONE.ATS|INFO_Curl patron curler ats1 ats2 reward-token curl-amount)
+ * (INFO-ONE.INFO_ATS|Curl patron curler ats1 ats2 reward-token curl-amount)
  */
 export async function getCurlPreviewInfo(
   patronAddress: string,
@@ -99,7 +99,7 @@ export async function getCurlPreviewInfo(
   try {
     const decimalAmount = formatDecimalForPact(amount);
     
-    const response = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.ATS|INFO_Curl "${patronAddress}" "${curlerAddress}" "${ats1Id}" "${ats2Id}" "${rewardTokenId}" ${decimalAmount})`, { tier: "T2" });
+    const response = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.INFO_ATS|Curl "${patronAddress}" "${curlerAddress}" "${ats1Id}" "${ats2Id}" "${rewardTokenId}" ${decimalAmount})`, { tier: "T2" });
 
 
 
@@ -116,7 +116,7 @@ export async function getCurlPreviewInfo(
 
 /**
  * Get brumate preview information from INFO-ONE
- * (INFO-ONE.ATS|INFO_Brumate patron brumator ats1 ats2 reward-token brumate-amount dayz)
+ * (INFO-ONE.INFO_ATS|Brumate patron brumator ats1 ats2 reward-token brumate-amount dayz)
  */
 export async function getBrumatePreviewInfo(
   patronAddress: string,
@@ -130,7 +130,7 @@ export async function getBrumatePreviewInfo(
   try {
     const decimalAmount = formatDecimalForPact(amount);
     
-    const response = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.ATS|INFO_Brumate "${patronAddress}" "${brumatorAddress}" "${ats1Id}" "${ats2Id}" "${rewardTokenId}" ${decimalAmount} ${lockDays})`, { tier: "T2" });
+    const response = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.INFO_ATS|Brumate "${patronAddress}" "${brumatorAddress}" "${ats1Id}" "${ats2Id}" "${rewardTokenId}" ${decimalAmount} ${lockDays})`, { tier: "T2" });
 
     if (!response || !response.result || response.result.status === "failure") {
       return null;
@@ -145,7 +145,7 @@ export async function getBrumatePreviewInfo(
 
 /**
  * Get constrict preview information from INFO-ONE
- * (INFO-ONE.ATS|INFO_Constrict patron constricter ats reward-token constrict-amount dayz)
+ * (INFO-ONE.INFO_ATS|Constrict patron constricter ats reward-token constrict-amount dayz)
  */
 export async function getConstrictPreviewInfo(
   patronAddress: string,
@@ -158,7 +158,7 @@ export async function getConstrictPreviewInfo(
   try {
     const decimalAmount = formatDecimalForPact(amount);
     
-    const response = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.ATS|INFO_Constrict "${patronAddress}" "${constracterAddress}" "${atsId}" "${rewardTokenId}" ${decimalAmount} ${lockDays})`, { tier: "T2" });
+    const response = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.INFO_ATS|Constrict "${patronAddress}" "${constracterAddress}" "${atsId}" "${rewardTokenId}" ${decimalAmount} ${lockDays})`, { tier: "T2" });
 
     if (!response || !response.result || response.result.status === "failure") {
       return null;
@@ -174,12 +174,12 @@ export async function getConstrictPreviewInfo(
 
 /**
  * Get Sublimate info from INFO-ONE
- * (ouronet-ns.INFO-ONE.ORBR|INFO_Sublimate <client:string> <target:string> <ouro-amount:decimal>)
+ * (ouronet-ns.INFO-ONE.INFO_ORBR|Sublimate <client:string> <target:string> <ouro-amount:decimal>)
  */
 export async function getSublimateInfo(client: string, target: string, amount: number): Promise<any> {
   try {
     const decimalAmount = amount % 1 === 0 ? `${amount}.0` : String(amount);
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.ORBR|INFO_Sublimate "${client}" "${target}" ${decimalAmount})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_ORBR|Sublimate "${client}" "${target}" ${decimalAmount})`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (response?.result?.status === "success") {
       return (response.result as any).data;
@@ -193,11 +193,11 @@ export async function getSublimateInfo(client: string, target: string, amount: n
 
 /**
  * Get Firestarter info from INFO-ONE
- * (ouronet-ns.INFO-ONE.SWP|INFO_Firestarter <firestarter:string>)
+ * (ouronet-ns.INFO-ONE.INFO_SWP|Firestarter <firestarter:string>)
  */
 export async function getFirestarterInfo(firestarter: string): Promise<any> {
   try {
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.SWP|INFO_Firestarter "${firestarter}")`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_SWP|Firestarter "${firestarter}")`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (response?.result?.status === "success") {
       return (response.result as any).data;
@@ -211,7 +211,7 @@ export async function getFirestarterInfo(firestarter: string): Promise<any> {
 
 /**
  * Get ChangeOwnership info from INFO-ONE
- * (ouronet-ns.INFO-ONE.SWP|INFO_ChangeOwnership <patron> <swpair> <new-owner>)
+ * (ouronet-ns.INFO-ONE.INFO_SWP|ChangeOwnership <patron> <swpair> <new-owner>)
  */
 export async function getChangeOwnershipInfo(
   patron:   string,
@@ -219,7 +219,7 @@ export async function getChangeOwnershipInfo(
   newOwner: string,
 ): Promise<any> {
   try {
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.SWP|INFO_ChangeOwnership "${patron}" "${swpair}" "${newOwner}")`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_SWP|ChangeOwnership "${patron}" "${swpair}" "${newOwner}")`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (response?.result?.status === "success") {
       return (response.result as any).data;
@@ -233,7 +233,7 @@ export async function getChangeOwnershipInfo(
 
 /**
  * Get ModifyWeights info from INFO-ONE
- * (ouronet-ns.INFO-ONE.SWP|INFO_ModifyWeights <patron> <swpair> <new-weights:[decimal]>)
+ * (ouronet-ns.INFO-ONE.INFO_SWP|ModifyWeights <patron> <swpair> <new-weights:[decimal]>)
  */
 export async function getModifyWeightsInfo(
   patron:     string,
@@ -245,7 +245,7 @@ export async function getModifyWeightsInfo(
       const s = String(w);
       return s.includes(".") ? s : `${s}.0`;
     }).join(" ")}]`;
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.SWP|INFO_ModifyWeights "${patron}" "${swpair}" ${weightList})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_SWP|ModifyWeights "${patron}" "${swpair}" ${weightList})`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (response?.result?.status === "success") {
       return (response.result as any).data;
@@ -259,7 +259,7 @@ export async function getModifyWeightsInfo(
 
 /**
  * Get ToggleSwapCapability info from INFO-ONE
- * (ouronet-ns.INFO-ONE.SWP|INFO_ToggleSwapCapability <patron> <swpair> <toggle:bool>)
+ * (ouronet-ns.INFO-ONE.INFO_SWP|ToggleSwapCapability <patron> <swpair> <toggle:bool>)
  */
 export async function getToggleSwapCapabilityInfo(
   patron: string,
@@ -267,7 +267,7 @@ export async function getToggleSwapCapabilityInfo(
   toggle: boolean,
 ): Promise<any> {
   try {
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.SWP|INFO_ToggleSwapCapability "${patron}" "${swpair}" ${toggle})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_SWP|ToggleSwapCapability "${patron}" "${swpair}" ${toggle})`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (response?.result?.status === "success") {
       return (response.result as any).data;
@@ -281,7 +281,7 @@ export async function getToggleSwapCapabilityInfo(
 
 /**
  * Get ToggleAddLiquidity info from INFO-ONE
- * (ouronet-ns.INFO-ONE.SWP|INFO_ToggleAddLiquidity <patron> <swpair> <toggle:bool>)
+ * (ouronet-ns.INFO-ONE.INFO_SWP|ToggleAddLiquidity <patron> <swpair> <toggle:bool>)
  */
 export async function getToggleAddLiquidityInfo(
   patron: string,
@@ -289,7 +289,7 @@ export async function getToggleAddLiquidityInfo(
   toggle: boolean,
 ): Promise<any> {
   try {
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.SWP|INFO_ToggleAddLiquidity "${patron}" "${swpair}" ${toggle})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_SWP|ToggleAddLiquidity "${patron}" "${swpair}" ${toggle})`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (response?.result?.status === "success") {
       return (response.result as any).data;
@@ -303,7 +303,7 @@ export async function getToggleAddLiquidityInfo(
 
 /**
  * Get ModifyCanChangeOwner info from INFO-ONE
- * (ouronet-ns.INFO-ONE.SWP|INFO_ModifyCanChangeOwner <patron> <swpair> <new-boolean:bool>)
+ * (ouronet-ns.INFO-ONE.INFO_SWP|ModifyCanChangeOwner <patron> <swpair> <new-boolean:bool>)
  */
 export async function getModifyCanChangeOwnerInfo(
   patron:     string,
@@ -311,7 +311,7 @@ export async function getModifyCanChangeOwnerInfo(
   newBoolean: boolean,
 ): Promise<any> {
   try {
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.SWP|INFO_ModifyCanChangeOwner "${patron}" "${swpair}" ${newBoolean})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_SWP|ModifyCanChangeOwner "${patron}" "${swpair}" ${newBoolean})`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (response?.result?.status === "success") {
       return (response.result as any).data;
@@ -325,7 +325,7 @@ export async function getModifyCanChangeOwnerInfo(
 
 /**
  * Get DPTF Transfer info from INFO-ONE
- * (ouronet-ns.INFO-ONE.DPTF|INFO_Transfer <patron> <token-id> <sender> <receiver> <amount>)
+ * (ouronet-ns.INFO-ONE.INFO_DPTF|Transfer <patron> <token-id> <sender> <receiver> <amount>)
  */
 export async function getTransferInfo(
   patron: string,
@@ -336,7 +336,7 @@ export async function getTransferInfo(
 ): Promise<any> {
   try {
     const decimalAmount = amount % 1 === 0 ? `${amount}.0` : String(amount);
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.DPTF|INFO_Transfer "${patron}" "${tokenId}" "${sender}" "${receiver}" ${decimalAmount})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_DPTF|Transfer "${patron}" "${tokenId}" "${sender}" "${receiver}" ${decimalAmount})`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (response?.result?.status === "success") {
       return (response.result as any).data;
@@ -370,7 +370,7 @@ export async function getRecoveryPrimordial(
 }
 
 // ── Cold Recovery Info ────────────────────────────────────────────────────────
-// (ouronet-ns.INFO-ONE.ATS|INFO_ColdRecovery <patron:string> <recoverer:string> <ats:string> <ra:decimal>)
+// (ouronet-ns.INFO-ONE.INFO_ATS|ColdRecovery <patron:string> <recoverer:string> <ats:string> <ra:decimal>)
 
 export async function getColdRecoveryInfo(
   patronAddress: string,
@@ -380,7 +380,7 @@ export async function getColdRecoveryInfo(
 ): Promise<any | null> {
   try {
     const decimalRa = ra.includes(".") ? ra : ra + ".0";
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.ATS|INFO_ColdRecovery "${patronAddress}" "${recovererAddress}" "${atsId}" ${decimalRa})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_ATS|ColdRecovery "${patronAddress}" "${recovererAddress}" "${atsId}" ${decimalRa})`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (!response || !response.result || response.result.status === "failure") return null;
     return (response.result as any).data ?? null;
@@ -391,7 +391,7 @@ export async function getColdRecoveryInfo(
 }
 
 // ── Direct Recovery Info ───────────────────────────────────────────────────────
-// (ouronet-ns.INFO-ONE.ATS|INFO_DirectRecovery <patron:string> <recoverer:string> <ats:string> <ra:decimal>)
+// (ouronet-ns.INFO-ONE.INFO_ATS|DirectRecovery <patron:string> <recoverer:string> <ats:string> <ra:decimal>)
 
 export async function getDirectRecoveryInfo(
   patronAddress: string,
@@ -401,7 +401,7 @@ export async function getDirectRecoveryInfo(
 ): Promise<any | null> {
   try {
     const decimalRa = ra.includes(".") ? ra : ra + ".0";
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.ATS|INFO_DirectRecovery "${patronAddress}" "${recovererAddress}" "${atsId}" ${decimalRa})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_ATS|DirectRecovery "${patronAddress}" "${recovererAddress}" "${atsId}" ${decimalRa})`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (!response || !response.result || response.result.status === "failure") return null;
     return (response.result as any).data ?? null;
@@ -435,16 +435,16 @@ export async function getMaxRecoveryAmount(
 }
 
 // ── Cull Info ─────────────────────────────────────────────────────────────────
-// (ouronet-ns.INFO-ONE.ATS|INFO_Cull <patron:string> <culler:string> <ats:string>)
+// (ouronet-ns.INFO-ONE.INFO_ATS|Cull <patron:string> <culler:string> <ats:string>)
 
 export async function getCullInfo(patronAddress: string, cullerAddress: string, atsId: string): Promise<any> {
-  const r = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.ATS|INFO_Cull "${patronAddress}" "${cullerAddress}" "${atsId}")`, { tier: "T2" });
+  const r = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.INFO_ATS|Cull "${patronAddress}" "${cullerAddress}" "${atsId}")`, { tier: "T2" });
   if (!r?.result || r.result.status === "failure") return null;
   return (r.result as any).data ?? null;
 }
 
 // ── Hibernated GSTOA Nonces ──────────────────────────────────────────────────
-// (ouronet-ns.INFO-ONE.VST|INFO-HibernatedNoncesDisplay <resident-account> <dpof>)
+// (ouronet-ns.INFO-ONE.INFO_VST|HibernatedNoncesDisplay <resident-account> <dpof>)
 
 export interface HibernatedNonce {
   nonce: number;
@@ -509,7 +509,7 @@ export async function getHibernatedNoncesDisplay(
   sortBy?: "nonce" | "fee-promile",
 ): Promise<HibernatedNonce[] | null> {
   try {
-    const inner = `(${KADENA_NAMESPACE}.INFO-ONE.VST|INFO-HibernatedNoncesDisplay "${residentAccount}" "${dpof}")`;
+    const inner = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_VST|HibernatedNoncesDisplay "${residentAccount}" "${dpof}")`;
     const pactCode = sortBy === "fee-promile"
       ? `(sort ["hibernating-fee-promile"] ${inner})`
       : inner;
@@ -528,7 +528,7 @@ export async function getHibernatedNoncesDisplay(
 }
 
 // ── Awake Info ────────────────────────────────────────────────────────────────
-// (ouronet-ns.INFO-ONE.VST|INFO_Awake <patron> <awaker> <dpof> <nonce>)
+// (ouronet-ns.INFO-ONE.INFO_VST|Awake <patron> <awaker> <dpof> <nonce>)
 
 export async function getAwakeInfo(
   patron: string,
@@ -537,7 +537,7 @@ export async function getAwakeInfo(
   nonce: number,
 ): Promise<Record<string, unknown> | null> {
   try {
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.VST|INFO_Awake "${patron}" "${awaker}" "${dpof}" ${nonce})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_VST|Awake "${patron}" "${awaker}" "${dpof}" ${nonce})`;
     const response = await pactRead(pactCode, { tier: "T2" });
 
     if (!response || !response.result || response.result.status === "failure") return null;
@@ -549,7 +549,7 @@ export async function getAwakeInfo(
 }
 
 // ── Slumber Info ──────────────────────────────────────────────────────────────
-// (ouronet-ns.INFO-ONE.VST|INFO_Slumber <patron> <merger> <dpof> <nonces:[integer]>)
+// (ouronet-ns.INFO-ONE.INFO_VST|Slumber <patron> <merger> <dpof> <nonces:[integer]>)
 
 export async function getSlumberInfo(
   patron: string,
@@ -559,7 +559,7 @@ export async function getSlumberInfo(
 ): Promise<Record<string, unknown> | null> {
   try {
     const nonceList = `[${nonces.join(" ")}]`;
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.VST|INFO_Slumber "${patron}" "${merger}" "${dpof}" ${nonceList})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_VST|Slumber "${patron}" "${merger}" "${dpof}" ${nonceList})`;
     const response = await pactRead(pactCode, { tier: "T2" });
 
     if (!response || !response.result || response.result.status === "failure") return null;
@@ -572,14 +572,14 @@ export async function getSlumberInfo(
 
 /**
  * Get ClearDispo preview info from INFO-ONE
- * (ouronet-ns.INFO-ONE.DPTF|INFO_ClearDispo <patron:string> <account:string>)
+ * (ouronet-ns.INFO-ONE.INFO_DPTF|ClearDispo <patron:string> <account:string>)
  */
 export async function getClearDispoInfo(
   patronAddress: string,
   accountAddress: string
 ): Promise<any> {
   try {
-    const response = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.DPTF|INFO_ClearDispo "${patronAddress}" "${accountAddress}")`, { tier: "T2" });
+    const response = await pactRead(`(${KADENA_NAMESPACE}.INFO-ONE.INFO_DPTF|ClearDispo "${patronAddress}" "${accountAddress}")`, { tier: "T2" });
     if (response.result.status === "failure") return null;
     return (response.result as any).data ?? null;
   } catch (error) {
@@ -592,7 +592,7 @@ export async function getClearDispoInfo(
 
 /**
  * INFO_AddLiquidity — dirty read for add liquidity preview.
- * (ouronet-ns.INFO-ONE.SWP|INFO_AddLiquidity patron account swpair input-amounts kda-pid)
+ * (ouronet-ns.INFO-ONE.INFO_SWP|AddLiquidity patron account swpair input-amounts kda-pid)
  */
 export async function getInfoAddLiquidity(
   patron: string,
@@ -607,7 +607,7 @@ export async function getInfoAddLiquidity(
       return s.includes(".") ? s : s + ".0";
     }).join(" ")}]`;
     const decKdaPid = kdaPid.includes(".") ? kdaPid : kdaPid + ".0";
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.SWP|INFO_AddLiquidity "${patron}" "${account}" "${swpair}" ${pactInputAmounts} ${decKdaPid})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_SWP|AddLiquidity "${patron}" "${account}" "${swpair}" ${pactInputAmounts} ${decKdaPid})`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (!response?.result || response.result.status === "failure") return null;
     return response.result.data;
@@ -619,7 +619,7 @@ export async function getInfoAddLiquidity(
 
 /**
  * INFO_Fuel — dirty read for fuel preview.
- * (ouronet-ns.INFO-ONE.SWP|INFO_Fuel patron account swpair input-amounts)
+ * (ouronet-ns.INFO-ONE.INFO_SWP|Fuel patron account swpair input-amounts)
  */
 export async function getInfoFuel(
   patron: string,
@@ -632,7 +632,7 @@ export async function getInfoFuel(
       const s = String(a || "0");
       return s.includes(".") ? s : s + ".0";
     }).join(" ")}]`;
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.SWP|INFO_Fuel "${patron}" "${account}" "${swpair}" ${pactInputAmounts})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_SWP|Fuel "${patron}" "${account}" "${swpair}" ${pactInputAmounts})`;
     const response = await pactRead(pactCode, { tier: "T2" });
     if (!response?.result || response.result.status === "failure") return null;
     return response.result.data;
@@ -698,7 +698,7 @@ export async function getInfoMultiPoolSwap(
 
 /**
  * INFO_RemoveLiquidity — dirty read for remove liquidity (unfold) preview.
- * (ouronet-ns.INFO-ONE.SWP|INFO_RemoveLiquidity patron account swpair lp-amount)
+ * (ouronet-ns.INFO-ONE.INFO_SWP|RemoveLiquidity patron account swpair lp-amount)
  */
 export async function getInfoRemoveLiquidity(
   patron: string,
@@ -708,7 +708,7 @@ export async function getInfoRemoveLiquidity(
 ): Promise<any | null> {
   try {
     const decLpAmount = lpAmount.includes(".") ? lpAmount : lpAmount + ".0";
-    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.SWP|INFO_RemoveLiquidity "${patron}" "${account}" "${swpair}" ${decLpAmount})`;
+    const pactCode = `(${KADENA_NAMESPACE}.INFO-ONE.INFO_SWP|RemoveLiquidity "${patron}" "${account}" "${swpair}" ${decLpAmount})`;
     // v3.3.0 (closes part of consolidated F-LOGGER-SEAM-001): the two
     // `console.log` debug-leak calls that used to live here were leftover
     // dev instrumentation (per-keystroke pretty-printed `JSON.stringify`
