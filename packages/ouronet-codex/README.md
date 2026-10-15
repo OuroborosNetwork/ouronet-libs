@@ -1,5 +1,42 @@
 # @ouronet/ouronet-codex
 
+> # ⛔ DEPRECATED — use [`@ancientpantheon/codex`](https://www.npmjs.com/package/@ancientpantheon/codex)
+>
+> **This package is no longer maintained and receives no further releases.** Its final
+> version is `0.5.7` (2026-06-20). The work continued under a new name during the
+> Pantheonic migration, and the successor is the package every current consumer installs:
+>
+> ```bash
+> npm uninstall @ouronet/ouronet-codex
+> npm install @ancientpantheon/codex
+> ```
+>
+> **Why the move, and why it is not just a rename.** `@ouronet/ouronet-codex` was scoped to
+> one ecosystem, and the Codex stopped being Ouronet-specific: the same vault now backs the
+> admin operator surface, the user Codex surface and foreign chains, with Ouronet's own
+> operations living in a `./ouronet` specialization rather than in the package root. The
+> successor reflects that — a Codex that HAS an Ouronet specialization, instead of a Codex
+> that IS Ouronet's.
+>
+> It is therefore **not** a drop-in rename, unlike the `@stoachain/ouronet-codex` →
+> `@ouronet/ouronet-codex` move recorded below. Import paths changed with the restructure
+> (`/ui`, `/arweave`, `/ouronet`), and the UI layer was reorganised in the successor's
+> 0.11.0 — see that package's own README and CHANGELOG for the current surface.
+>
+> **Nothing here is being unpublished.** Every version stays installable, so an existing
+> lockfile keeps resolving and no build breaks on account of this notice. What stops is
+> maintenance: no fixes, no security updates, no new versions. The two defects fixed in
+> `@ouronet/ouronet-core` 5.3.0 — the 2,000,000-gas limit and the transposed `INFO_` names —
+> were NOT backported here, and nothing else will be either.
+>
+> **Status at deprecation, for the record.** As of 2026-10-15 this package has zero live
+> importers in OuronetUI (every remaining mention is a historical comment), is not present
+> in its `node_modules`, and is not depended on by any other package in this repository.
+> It was deprecated because it was already unused, not in order to make it so.
+
+<details>
+<summary>Historical README (pre-deprecation)</summary>
+
 > Modular React Codex for the Ouronet ecosystem — drop-in `<CodexProvider>` + hooks + headless components giving any React consumer (OuronetUI, AncientHoldings hub, future apps) full 1:1 Codex functionality without re-implementing it.
 
 > **Renamed.** This package was published as `@stoachain/ouronet-codex` through 0.5.6. The
@@ -139,3 +176,5 @@ Full API + integration patterns: see [the spec doc](https://github.com/StoaChain
 ## License
 
 UNLICENSED — internal StoaChain ecosystem use.
+
+</details>
