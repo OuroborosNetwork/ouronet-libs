@@ -39,7 +39,26 @@ import { formatDecimalForPact } from "@stoachain/stoa-core/pact";
  * Transfer* modals emit this shape, differing only in token-id.
  *
  *   (ouronet-ns.TS01-C1.DPTF|C_Transfer
- *     <patron> <token-id> <sender> <receiver> <amount:decimal> <method:bool>)
+ *     <patron> <executor> <executee> <id> <amount:decimal> <method:bool>)
+ *
+ * ARGUMENT ORDER, AND WHY IT MOVED. This emitted `<patron> <token-id> <sender>
+ * <receiver>` until 2026-10-16, which had been correct and silently stopped
+ * being so: the sovereign `patron`/`executor`/`executee` canon sweep gave every
+ * `C_` entrypoint the same first three slots, and the deployed Talos now reads
+ * `(patron executor executee id ...)`. Its own doc is the authority -- "Transfers
+ * a DPTF Token from <executor> to <executee>" -- so `executor` is the SENDER and
+ * `executee` is the RECEIVER.
+ *
+ * The failure this caused is worth recording because it looked like anything but
+ * an ordering bug. Arity still matched (6 and 6), so `check-builder-arity.py`
+ * passed. The INFO preview has its OWN signature (`patron id sender receiver
+ * amount`) which did NOT move, so the cost preview rendered correctly and only
+ * the execution failed. And the chain's complaint named the table, not the
+ * caller: the receiver's account landed in the `id` slot, so Pact reported
+ * "No value found in table DPTF|PropertiesTable for key: <the receiver's
+ * address>" -- which reads as a missing token, not a misplaced argument.
+ * Reported by two users as "transferring OURO doesn't work"; it was every token,
+ * since all nine Transfer modals share this builder.
  *
  * `method` is `false` for standard accounts and `true` for smart
  * accounts. `amount` is formatted to `x.y` decimal form.
@@ -53,7 +72,7 @@ export function buildTransferPactCode(p: {
   method:   boolean;
 }): string {
   const dec = formatDecimalForPact(p.amount);
-  return `(${KADENA_NAMESPACE}.TS01-C1.DPTF|C_Transfer "${p.patron}" "${p.tokenId}" "${p.sender}" "${p.receiver}" ${dec} ${p.method})`;
+  return `(${KADENA_NAMESPACE}.TS01-C1.DPTF|C_Transfer "${p.patron}" "${p.sender}" "${p.receiver}" "${p.tokenId}" ${dec} ${p.method})`;
 }
 
 /**

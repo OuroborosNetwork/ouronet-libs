@@ -88,14 +88,30 @@ const DPOF     = "H|GSTOA-xyz";
 // ─── TS01-C1.DPTF — Transfer + ClearDispo ───────────────────────────────────
 
 describe("buildTransferPactCode", () => {
-  it("emits the canonical 6-arg C_Transfer shape", () => {
+  /**
+   * CORRECTED 2026-10-16, AND IT WAS THIS TEST THAT LET THE BUG LIVE.
+   *
+   * It read `"${PATRON}" "${TOKEN}" "${SENDER}" "${RECEIVER}"` and called that shape
+   * "canonical". It was not canonical; it was a transcription of whatever the builder
+   * happened to emit, asserted against a string written by the same hand. The chain's
+   * actual signature is `(patron executor executee id amount method)` -- the sovereign
+   * canon sweep moved it -- so the builder had been putting the token id in the
+   * `executor` slot and the receiver in the `id` slot, and every true-fungible transfer
+   * in the wallet failed with "No value found in table DPTF|PropertiesTable for key:
+   * <the receiver's address>".
+   *
+   * A test that pins a function to its own output verifies that the function is
+   * deterministic, which was never in doubt. `builder-arg-order.test.ts` now checks the
+   * emitted order against the REGISTRY, which is the thing that can actually disagree.
+   */
+  it("emits the deployed 6-arg C_Transfer shape: patron, executor, executee, id", () => {
     expect(
       buildTransferPactCode({
         patron: PATRON, tokenId: TOKEN, sender: SENDER,
         receiver: RECEIVER, amount: "5", method: false,
       }),
     ).toBe(
-      `(ouronet-ns.TS01-C1.DPTF|C_Transfer "${PATRON}" "${TOKEN}" "${SENDER}" "${RECEIVER}" 5.0 false)`,
+      `(ouronet-ns.TS01-C1.DPTF|C_Transfer "${PATRON}" "${SENDER}" "${RECEIVER}" "${TOKEN}" 5.0 false)`,
     );
   });
 

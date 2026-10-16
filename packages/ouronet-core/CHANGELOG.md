@@ -4,6 +4,42 @@ All notable changes to `@ouronet/ouronet-core`.
 
 This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3.3.8. v4.0.0 split it into a two-package npm workspace under `StoaChain/stoa-js` — chain-generic infrastructure moved out into [`@stoachain/stoa-core`](https://www.npmjs.com/package/@stoachain/stoa-core), this package retained the Ouronet-specific business logic. The `4.0.0` heading below is the first release after the split.
 
+## 5.3.2 — 2026-10-16
+
+### Every true-fungible transfer was sending its arguments in the wrong order
+
+`buildTransferPactCode` emitted `(patron token-id sender receiver amount method)`. The
+deployed Talos reads `(patron executor executee id amount method)` — the sovereign
+`patron`/`executor`/`executee` canon sweep moved the signature and this builder was never
+carried across. So the token id went into the `executor` slot and the receiver's address
+into the `id` slot, and the chain refused with
+
+    No value found in table ouronet-ns.DPTF_DPTF|PropertiesTable for key: <receiver address>
+
+Reported twice as "transferring OURO doesn't work". It was not OURO-specific: all nine
+Transfer modals in the wallet share this builder, so OURO, IGNIS, AURYN, Elite AURYN,
+WSTOA, SSTOA, GSTOA, UrStoa and LP transfers were all broken.
+
+`executor` is the SENDER and `executee` is the RECEIVER, per the deployed function's own
+doc ("Transfers a DPTF Token from `<executor>` to `<executee>`") — not inferred from the
+names.
+
+**Why it survived:** arity still matched (six and six), so the arity checker passed. The
+INFO preview has a separate signature that did NOT move, so the cost preview rendered
+correctly and only the signed execution failed. And `cfm-builders.test.ts` asserted the
+emitted string against a copy of itself, calling the wrong shape "canonical" — a test that
+pins a function to its own output proves only that it is deterministic.
+
+**New guard:** `builder-arg-order.test.ts` checks all 50 builders' argument ORDER, by name
+and position, against `@ouronet/talos-registry`'s copy of the deployed surface — including
+an explicit assertion that the transfer's sender and receiver land in `executor` and
+`executee` in that order, since reversing them would pass every structural check and move
+money to the wrong account. It also refuses to pass vacuously: it asserts it resolved
+builders at all, because an earlier version of this scan matched nothing and reported a
+clean sweep.
+
+Audited the other 49 builders the same way: no other order or arity mismatch.
+
 ## 5.3.1 — 2026-10-15
 
 ### A 59th transposed `INFO_` name, and a test so there is no 60th
