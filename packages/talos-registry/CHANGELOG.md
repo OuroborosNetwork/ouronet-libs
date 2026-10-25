@@ -1,3 +1,46 @@
+## 2.4.0 — 2026-10-25
+
+**The Ouronet V14 surface: two one-way latches, and a preview that should have shipped with V13.**
+
+Regenerated from the chain (`_registry.py --probe`) after V14 deployed.
+**439 → 442 entrypoints, 444 → 447 previews.** `surfaceHash`
+`77a4205182ce2954` → `56f3f7f008117146`.
+
+### Added entrypoints
+
+- `TS02-C3.AQP-FVT|CC_LatchStreamEligible` — the FVT-level stream-eligibility
+  latch. Heavy: it scans every enabled member and refuses while any one of them
+  is not drift-locked. One-way.
+- `TS02-C3.AQP-SCR|C_LockScoreDrift` — the score-level drift latch, settable
+  only while `deb-boost` is false **and** `boost-class-link` is BAR. One-way.
+- `TS02-C3.AQP-FVT|C_SetMinInjectAmount` — **not new on chain.** It shipped in
+  V13 with no `INFO_` reader, so the registry carried it as an entrypoint a
+  client could not price, and `generate-execution-specs.py` skipped it with "no
+  INFO preview". V14's `INFO_AQP-FVT|SetMinInjectAmount` closes that, and it
+  enters this snapshot previewable for the first time.
+
+### Added previews
+
+- `AQP-INFO.INFO_AQP-SCR|LockScoreDrift`
+- `AQP-INFO.INFO_AQP-FVT|LatchStreamEligible`
+- `AQP-INFO.INFO_AQP-FVT|SetMinInjectAmount`
+
+Each was measured against what the chain actually charged, not merely asserted:
+predicted 9.54 / 14.84 / 32.33 against real 9.5400 / 14.8400 / 32.3300.
+
+### Why the latches exist
+
+`CC_InjectStream` could open a stream over a **stale** membership. The drip
+divides by the stored `total-deb-score` mirror and pays each member against
+their stored deb for the stream's whole duration — with no fix loop and no
+freshness enforce — so a mis-split persisted for the life of the stream and was
+never corrected retroactively. Rather than add a scan at drip time (gas on a
+path that deliberately has none), the invariant moved to two one-way latches
+proven once at latch time and kept true at every later admission.
+
+**Consumers gain three callable entrypoints and three previews.** Nothing was
+removed; no existing signature changed.
+
 ## 2.3.1-0 — 2026-10-14
 
 **No functional change. This release exists to activate OIDC trusted publishing.**
