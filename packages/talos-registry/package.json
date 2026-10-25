@@ -1,6 +1,6 @@
 {
   "name": "@ouronet/talos-registry",
-  "version": "2.3.1-0",
+  "version": "2.4.0",
   "description": "The Ouronet callable surface, generated from the deployed contracts. Supply values; never type a function name.",
   "type": "module",
   "main": "./dist/index.js",
