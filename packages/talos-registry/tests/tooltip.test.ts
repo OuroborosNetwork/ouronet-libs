@@ -217,9 +217,9 @@ describe("TOOLTIP-CANON.md quotes figures that are still true", () => {
       const b = pv.params.map((p) => p.name).join(",");
       a === b ? same++ : diff++;
     }
-    expect(diff).toBe(423);
+    expect(diff).toBe(426);
     expect(same).toBe(16);
-    expect(CANON).toContain("423 of the 439");
+    expect(CANON).toContain("426 of the 442");
     expect(CANON).toContain("Only 16");
   });
 
