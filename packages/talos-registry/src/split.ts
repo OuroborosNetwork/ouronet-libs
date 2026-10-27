@@ -13,8 +13,21 @@ import type { Entrypoint, Partition } from "./types.js";
  */
 export interface SplitPlan {
   key: string;
-  /** null when the operation is UNCLASSIFIED -- no judgement has been recorded, so do not split */
+  /**
+   * WHICH KIND OF SPLIT, or null when UNCLASSIFIED. Read this before anything else: only `list`
+   * can be cut client-side. `cursor` means driving a pager until it reports done; `architectural`
+   * means running a defpact's ordered steps. Treating either of the latter as a list split would
+   * slice an argument that does not exist, or cap an unbounded workload at a fixed step count.
+   */
+  kind: Partition["kind"] | null;
+  /** `list` only */
   shape: Partition["shape"] | null;
+  /** `cursor` / `architectural` -- the entrypoint that carries the split */
+  via: string | null;
+  /** `cursor` -- the reads that report progress; drive the pager until they say done */
+  progress: string[];
+  /** `architectural` -- the twin's step count */
+  steps: number | null;
   /** the list parameter that gets cut */
   axis: string | null;
   /** parameters positional against `axis`, cut with it */
@@ -28,7 +41,11 @@ export interface SplitPlan {
   inner: { axis: string; lockstep: string[]; note: string } | null;
   /** total LEAF legs in a given argument set -- the unit gas is actually spent on */
   leaves: ((values: Readonly<Record<string, unknown>>) => number) | null;
-  /** true only when a recorded judgement permits cutting */
+  /**
+   * TRUE ONLY FOR `kind: "list"` -- i.e. only when a client may cut an argument itself. A
+   * `cursor` or `architectural` route is a real split and is NOT this: it is performed by
+   * calling `via`, not by slicing. `splitCall` refuses anything but a list for that reason.
+   */
   splittable: boolean;
   /** true when the pieces may be submitted TOGETHER. False for a reduction's rounds. */
   parallel: boolean;
@@ -45,7 +62,8 @@ export function splitPlan(key: string): SplitPlan {
   const p = ep.execution.partition;
   if (!p) {
     return {
-      key, shape: null, axis: null, lockstep: [], inner: null, leaves: null,
+      key, kind: null, shape: null, via: null, progress: [], steps: null,
+      axis: null, lockstep: [], inner: null, leaves: null,
       splittable: false, parallel: false, rounds: null, reason: null,
       warnings: [
         "UNCLASSIFIED. No split judgement is recorded for this entrypoint, so it must be sent " +
@@ -55,6 +73,39 @@ export function splitPlan(key: string): SplitPlan {
     };
   }
   const warnings: string[] = [];
+
+  // A CURSOR ROUTE IS NOT CUTTABLE. The entrypoint takes no list; the set it traverses lives in
+  // chain state, so there is nothing here for a client to slice.
+  if (p.kind === "cursor") {
+    return {
+      key, kind: "cursor", shape: null, via: p.via ?? null, progress: p.progress ?? [],
+      steps: null, axis: null, lockstep: [], inner: null, leaves: null,
+      splittable: false, parallel: false, rounds: null, reason: p.reason,
+      warnings: [
+        `CURSOR ROUTE. This call takes no list -- the work it traverses lives in chain state, so ` +
+          `there is nothing to cut. Drive '${p.via}' instead: it takes a chunk SIZE and advances ` +
+          `stored progress, so the calls are STRICTLY ORDERED and firing two concurrently races ` +
+          `the cursor. Repeat until ${(p.progress ?? []).join(" / ")} reports done.`,
+      ],
+    };
+  }
+
+  // AN ARCHITECTURAL ROUTE IS NOT CUTTABLE EITHER, and for a different reason: the decomposition
+  // is into ordered phases intrinsic to the operation, carried by continuation state.
+  if (p.kind === "architectural") {
+    return {
+      key, kind: "architectural", shape: null, via: p.via ?? null, progress: [],
+      steps: p.steps ?? null, axis: null, lockstep: [], inner: null, leaves: null,
+      splittable: false, parallel: false, rounds: null, reason: p.reason,
+      warnings: [
+        `ARCHITECTURAL ROUTE. The split is into ${p.steps ?? "?"} ORDERED PHASES intrinsic to ` +
+          `this operation, not into pieces of a list -- so it is a defpact, '${p.via}', and its ` +
+          `steps advance by \`cont\` against the pact id step 0 returns. Use it ONLY when the ` +
+          `single transaction is measured over the limit; it is the fallback, not the route.`,
+      ],
+    };
+  }
+
   if (p.shape === "reduction") {
     warnings.push(
       "REDUCTION, not a partition. Each batch produces a NEW intermediate that must be fed back " +
@@ -80,9 +131,11 @@ export function splitPlan(key: string): SplitPlan {
         "one leaves a single oversized element that still will not fit. Use splitCallByCapacity.",
     );
   }
+  const axis = p.axis!;
   return {
-    key, shape: p.shape, axis: p.axis, lockstep: p.lockstep ?? [], inner,
-    leaves: (vals) => countLeaves(p.axis, inner?.axis ?? null, vals),
+    key, kind: "list", shape: p.shape ?? null, via: null, progress: [], steps: null,
+    axis, lockstep: p.lockstep ?? [], inner,
+    leaves: (vals) => countLeaves(axis, inner?.axis ?? null, vals),
     splittable: true, parallel: p.shape === "partition",
     rounds: p.rounds ?? null, reason: p.reason, warnings,
   };
@@ -106,6 +159,26 @@ function countLeaves(
   if (!Array.isArray(nested)) return outer.length;
   return nested.reduce<number>(
     (a, v) => a + (Array.isArray(v) ? v.length : 1), 0);
+}
+
+/**
+ * WHY THIS CALL CANNOT BE CUT — distinct messages, because the three reasons need three actions.
+ * Telling someone to "record a partition block" for a cursor route sends them to author metadata
+ * for an argument that does not exist.
+ */
+function refusal(key: string, plan: SplitPlan): string {
+  if (plan.kind === "cursor") {
+    return `${key} is a CURSOR route and takes no list to cut. Drive '${plan.via}' until ` +
+      `${plan.progress.join(" / ")} reports done -- strictly one at a time, since two race the ` +
+      `stored cursor.`;
+  }
+  if (plan.kind === "architectural") {
+    return `${key} is an ARCHITECTURAL route: its split is ${plan.steps} ordered phases, not ` +
+      `pieces of a list. Run the defpact '${plan.via}' instead, advancing its steps by \`cont\` ` +
+      `against the pact id step 0 returns.`;
+  }
+  return `${key} carries no split judgement, so it cannot be cut. Send it as one transaction, ` +
+    `or record a partition block in OURONET-REGISTRY.authored.json after reading the operation.`;
 }
 
 /**
@@ -155,10 +228,7 @@ export function splitCall(
 ): Record<string, unknown>[] {
   const plan = splitPlan(key);
   if (!plan.splittable || !plan.axis) {
-    throw new RegistryError(
-      `${key} carries no split judgement, so it cannot be cut. Send it as one transaction, or ` +
-        `record a partition block in OURONET-REGISTRY.authored.json after reading the operation.`,
-    );
+    throw new RegistryError(refusal(key, plan));
   }
   const axisVal = values[plan.axis];
   if (!Array.isArray(axisVal)) {
@@ -234,10 +304,7 @@ export function splitCallByCapacity(
 ): Record<string, unknown>[] {
   const plan = splitPlan(key);
   if (!plan.splittable || !plan.axis) {
-    throw new RegistryError(
-      `${key} carries no split judgement, so it cannot be cut. Send it as one transaction, or ` +
-        `record a partition block in OURONET-REGISTRY.authored.json after reading the operation.`,
-    );
+    throw new RegistryError(refusal(key, plan));
   }
   if (!Number.isInteger(capacity) || capacity < 1) {
     throw new RegistryError(`${key}: capacity must be a positive integer, got ${capacity}`);

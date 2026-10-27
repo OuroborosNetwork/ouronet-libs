@@ -1,3 +1,102 @@
+## 2.6.0 — 2026-10-27
+
+**`partition.kind` — a split is LIST-based, CURSOR-based or ARCHITECTURAL, and
+the three are not interchangeable.**
+
+`surfaceHash` `65c983178cb70985` → `ab8e2031f3fc0be5`. 442 entrypoints and 447
+previews unchanged. **30 entries now carry a route: 20 `list`, 8
+`architectural`, 2 `cursor`.**
+
+### Added — the kind discriminator
+
+2.5.0 described one kind of split: cut a list argument. That is incomplete, and
+the gap is structural rather than cosmetic.
+
+| kind | the list is | piece count | expressed as |
+|---|---|---|---|
+| `list` | an **argument** | **measured**, unbounded | N independent transactions |
+| `cursor` | in chain **state** | unbounded, not knowable | a pager advancing stored progress, **strictly sequential** |
+| `architectural` | *there is no list* | **fixed**, intrinsic | a defpact's ordered phases |
+
+**WHY A DEFPACT CANNOT CARRY A LIST SPLIT** (owner ruling 2026-10-27, and the
+distinction this taxonomy was missing): *"defpacts is not ideal for list based
+split because the list can be longer than the number of steps defined in the
+defpacts."* A defpact's step count is **fixed by its definition**; a list has no
+fixed length. So a defpact expresses a decomposition whose piece-count is
+**intrinsic** to the operation — ordered phases, each depending on what the last
+left behind, which is what continuation state is for — and it cannot express one
+whose piece-count comes from measuring a list. A 2-step twin caps the work at
+two steps forever.
+
+### Added — 8 architectural routes, DERIVED not authored
+
+Every defpact already names its single-transaction twin in `preferInstead`.
+Inverting that pointer **is** the architectural route, so the eight are
+generated rather than hand-written and cannot drift from the eight pairs the
+existing check already validates in the other direction.
+
+They are **triggered by measurement only**: the single transaction is the route
+whenever it fits, which is why these carried `supported: false`. At a 2,000,000
+gas limit the SWP family measures 415,419 — 21% of budget — so the route never
+fires. It would fire at the old 150,000. Owner, confirming the rule is uniform
+rather than special-cased: *"if the block limit would have been 150k limit this
+would be the case of the swp defpacts."*
+
+That also retires `supported: false` as a hand-kept verdict. The twin is not
+*unsupported*; it is **the architectural route, gated on gas** — a fact about
+the operation rather than a policy that goes stale when the block limit moves.
+Which it already did once.
+
+### Added — 2 cursor routes, and the two defpacts they supersede
+
+`AQP-FVT|CC_Inject` and `CC_SweepRevokeAnchor` take **no list parameter** —
+`(patron, executor, fvt-id, reward-dptf-id, amount)` and
+`(patron, executor, anchor-id)`. Their work is list-*shaped*, but the set lives
+in chain state (`URH_FvtStalePresentUsers`, `UR_FVT|SweepProgress`). So a client
+has nothing to cut, and `kind: list` would invite it to slice an argument that
+does not exist.
+
+Their scalable route is the matching pager — `CCp_InjectFixChunk`,
+`CCp_SweepRecomputeChunk` — whose own note already reads *"repeat until the
+report says done"*: **unbounded** calls, strictly sequential because two race
+the cursor.
+
+**So `MTX-AQP|2|CC_Inject` and `MTX-AQP|2|CC_SweepRevokeAnchor` are recorded as
+`architecturalSuperseded`, not offered as routes.** They are `steps: 2` against
+an unbounded workload — list-shaped work solved with a fixed-step tool. Owner,
+on why they exist: *"i dont even know why we made them in the first place."*
+They are the first attempt, kept deployed because a deployed module cannot be
+removed.
+
+**Measured, and this is the live case:** an inject on a 5-score pool cost
+~257,000 gas and scales with the score and present-user sets. It is the first
+route in this registry expected to be needed in practice rather than in
+principle.
+
+### Verified
+
+10 new generator rules, each negative-tested by breaking the data: a bogus kind;
+a cursor `via` that is not a pager, is not an entrypoint, or is a **defpact**; a
+cursor whose `progress` disagrees with the pager's own preflight; a cursor
+carrying a list axis; an architectural `via` that is not a defpact or does not
+point back; a step count disagreeing with the twin's; a superseded orphan; and a
+superseded entry that is not a defpact.
+
+The tenth is the one negative testing earned: **the two mechanisms must be
+jointly exhaustive.** Every defpact naming a twin is either derived into an
+architectural route or explicitly superseded. Dropping a supersession entry was
+initially *invisible* — the twin already carried an authored `cursor` block, the
+derivation skips authored keys, and nothing objected. The behaviour stayed right
+by accident while the record of **why** evaporated, which is the state that
+rots: remove the cursor block next and the derivation silently makes an
+unbounded workload architectural again.
+
+`splitPlan` now reports `kind`, `via`, `progress` and `steps`; `splittable` means
+**list-splittable only**. `splitCall` and `splitCallByCapacity` refuse the other
+two kinds with the action each one needs — telling someone to "record a partition
+block" for a cursor route sends them to author metadata for an argument that
+does not exist. 563 tests; 6 mutations of the kind dispatch verified to fail.
+
 ## 2.5.0 — 2026-10-27
 
 **`execution.partition` — whether an operation may be split across transactions,

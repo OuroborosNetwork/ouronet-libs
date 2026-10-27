@@ -65,6 +65,29 @@ export interface Continuation {
  */
 export interface Partition {
   /**
+   * WHICH KIND OF SPLIT THIS IS — read this first; the rest of the block depends on it.
+   *
+   * `list`          The list is an ARGUMENT. A client cuts it, the piece count comes from
+   *                 MEASUREMENT and is unbounded, and `axis`/`lockstep`/`inner`/`shape` describe
+   *                 how. Use `splitCall` / `splitCallByCapacity`.
+   * `cursor`        The work is list-SHAPED but the list lives in chain STATE — the entrypoint
+   *                 takes no list at all, so there is nothing for a client to cut. `via` names a
+   *                 pager that advances stored progress: unbounded calls, STRICTLY SEQUENTIAL
+   *                 (two race the cursor), repeated until the `progress` reads say done.
+   * `architectural` The operation decomposes into ORDERED PHASES intrinsic to itself, each
+   *                 depending on what the last left behind. That is continuation state, so a
+   *                 defpact is its only expression and `via` names it. DERIVED by inverting that
+   *                 defpact's own `preferInstead`.
+   *
+   * WHY A DEFPACT CANNOT CARRY A LIST SPLIT (owner ruling, 2026-10-27 — the distinction this
+   * taxonomy was missing): a defpact's step count is FIXED by its definition, while a list has
+   * no fixed length. So a defpact expresses a decomposition whose piece-count is INTRINSIC to
+   * the operation, and it cannot express one whose piece-count comes from measuring a list — a
+   * 2-step twin caps the work at two steps forever. Two AQP defpacts were written for exactly
+   * that mistake and are recorded as superseded by cursor pagers rather than offered as routes.
+   */
+  kind: "list" | "cursor" | "architectural";
+  /**
    * `partition` -- cutting `axis` yields pieces whose combined effect equals the single call.
    *               One round, order-independent, submit them all at once.
    * `reduction`  -- each piece yields a NEW intermediate that must be fed back in (merging 860
@@ -77,9 +100,15 @@ export interface Partition {
    * rather than "parallel" and a strictly sequential cursor pager ended up wearing a prefix
    * that promised parallel safety (StoicSyntax-Prefixes.md, CORRECTION 2026-09-14).
    */
-  shape: "partition" | "reduction";
-  /** the list-typed parameter that is cut. Guaranteed by `--check` to exist and be a list. */
-  axis: string;
+  shape?: "partition" | "reduction";
+  /** `list` only — the list-typed parameter that is cut. Checked to exist and be a list. */
+  axis?: string;
+  /** `cursor` / `architectural` only — the entrypoint that carries the split. */
+  via?: string;
+  /** `cursor` only — the reads that report progress. Must equal the pager's own preflight. */
+  progress?: string[];
+  /** `architectural` only — the twin's step count, checked against the twin itself. */
+  steps?: number;
   /**
    * Parameters POSITIONAL against `axis`, which must be cut WITH it. The failure mode here is
    * silent rather than loud: two arrays that line up by LENGTH and are misaligned move the wrong

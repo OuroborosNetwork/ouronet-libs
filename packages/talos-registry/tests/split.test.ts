@@ -8,7 +8,7 @@
  * with no error from the contract.
  */
 import { describe, it, expect } from "vitest";
-import { splitPlan, splitCall, registry, entrypointKeys, RegistryError } from "../src/index.js";
+import { splitPlan, splitCall, splitCallByCapacity, registry, entrypointKeys, RegistryError } from "../src/index.js";
 
 const UNSTAKE = "TS02-C3.AQP-POOL|CC_UnstakeNonFungibleCollectable";
 const BULK    = "TS02-C2.DPNF|C_BulkTransfer";
@@ -141,9 +141,13 @@ describe("every authored claim holds against the signature", () => {
     for (const key of entrypointKeys()) {
       const p = registry.entrypoints[key]!.execution.partition;
       if (!p) continue;
+      // SCOPED TO `kind: "list"` since 2.6.0. A cursor or architectural route carries no axis --
+      // that is the point of the kind -- so asserting one here would fail on exactly the routes
+      // the kind exists to describe.
+      if (p.kind !== "list") continue;
       const types = new Map(registry.entrypoints[key]!.params.map(q => [q.name, q.type]));
-      expect(types.get(p.axis), `${key} axis ${p.axis}`).toBeDefined();
-      expect(types.get(p.axis)!.startsWith("["), `${key} axis is a list`).toBe(true);
+      expect(types.get(p.axis!), `${key} axis ${p.axis}`).toBeDefined();
+      expect(types.get(p.axis!)!.startsWith("["), `${key} axis is a list`).toBe(true);
       for (const c of p.lockstep ?? []) {
         expect(types.get(c), `${key} lockstep ${c}`).toBeDefined();
         expect(types.get(c)!.startsWith("["), `${key} ${c} is a list`).toBe(true);
@@ -164,5 +168,82 @@ describe("every authored claim holds against the signature", () => {
         expect(splitPlan(k).splittable, `${k} must stay unclassified`).toBe(false);
       }
     }
+  });
+});
+
+describe("the three kinds, and what each one means a client must DO", () => {
+  const CURSOR = "TS02-C3.AQP-FVT|CC_Inject";
+  const ARCH   = "TS01-C3.SWP|C_AddLiquidity";
+  const LIST   = "TS02-C3.AQP-POOL|CC_UnstakeNonFungibleCollectable";
+
+  it("a LIST route is the only one a client may cut itself", () => {
+    expect(splitPlan(LIST).kind).toBe("list");
+    expect(splitPlan(LIST).splittable).toBe(true);
+    expect(splitPlan(CURSOR).splittable).toBe(false);
+    expect(splitPlan(ARCH).splittable).toBe(false);
+  });
+
+  it("a CURSOR route names an unbounded pager and its completion signal", () => {
+    const p = splitPlan(CURSOR);
+    expect(p.kind).toBe("cursor");
+    expect(p.via).toBe("TS02-C3.AQP-FVT|CCp_InjectFixChunk");
+    expect(p.progress).toEqual(["AQP-FVT.URH_FvtStalePresentUsers"]);
+    expect(p.axis).toBeNull();
+    expect(p.parallel).toBe(false);
+    expect(p.warnings.join(" ")).toMatch(/STRICTLY ORDERED/);
+    expect(p.warnings.join(" ")).toMatch(/races the cursor/);
+  });
+
+  it("the entrypoint behind a CURSOR route really takes no list", () => {
+    // The whole justification for the kind: there is nothing in the signature to cut.
+    const params = registry.entrypoints[CURSOR]!.params;
+    expect(params.filter(p => p.type.startsWith("["))).toEqual([]);
+  });
+
+  it("an ARCHITECTURAL route names a defpact and its FIXED step count", () => {
+    const p = splitPlan(ARCH);
+    expect(p.kind).toBe("architectural");
+    expect(p.via).toBe("TS01-CP.SWP|C_AddStandardLiquidity");
+    expect(p.steps).toBe(3);
+    expect(p.axis).toBeNull();
+    expect(p.warnings.join(" ")).toMatch(/ORDERED PHASES/);
+    expect(p.warnings.join(" ")).toMatch(/fallback, not the route/);
+  });
+
+  it("every architectural route's via is a defpact pointing BACK at it", () => {
+    for (const k of entrypointKeys()) {
+      const p = registry.entrypoints[k]!.execution.partition;
+      if (p?.kind !== "architectural") continue;
+      const via = registry.entrypoints[p.via!]!;
+      expect(via.execution.mode, `${k} via is a defpact`).toBe("defpact");
+      expect(via.execution.preferInstead, `${k} inversion holds`).toBe(k);
+      expect(p.steps, `${k} steps agree`).toBe(via.execution.steps);
+    }
+  });
+
+  it("the two AQP defpacts are NOT offered as architectural routes", () => {
+    // They are list-shaped work with a FIXED 2-step tool -- superseded by cursor pagers. A
+    // defpact caps an unbounded workload at its step count, which is the whole reason the
+    // `cursor` kind exists.
+    for (const dp of ["TS02-C3.MTX-AQP|2|CC_Inject",
+                      "TS02-C3.MTX-AQP|2|CC_SweepRevokeAnchor"]) {
+      const twin = registry.entrypoints[dp]!.execution.preferInstead!;
+      expect(splitPlan(twin).kind, `${twin} must be cursor, not architectural`).toBe("cursor");
+      expect(splitPlan(twin).via).not.toBe(dp);
+    }
+  });
+
+  it("splitCall refuses each non-list kind with the action that kind needs", () => {
+    expect(() => splitCall(CURSOR, { amount: 1 }, 2)).toThrow(/CURSOR route and takes no list/);
+    expect(() => splitCall(CURSOR, { amount: 1 }, 2)).toThrow(/CCp_InjectFixChunk/);
+    expect(() => splitCall(ARCH, { amount: 1 }, 2)).toThrow(/ARCHITECTURAL route/);
+    expect(() => splitCall(ARCH, { amount: 1 }, 2)).toThrow(/3 ordered phases/);
+    expect(() => splitCall("TS01-C1.DPTF|C_Transfer", { amount: 1 }, 2))
+      .toThrow(/no split judgement/);
+  });
+
+  it("splitCallByCapacity refuses them too, with the same distinct messages", () => {
+    expect(() => splitCallByCapacity(CURSOR, { amount: 1 }, 10)).toThrow(/CURSOR route/);
+    expect(() => splitCallByCapacity(ARCH, { amount: 1 }, 10)).toThrow(/ARCHITECTURAL route/);
   });
 });
