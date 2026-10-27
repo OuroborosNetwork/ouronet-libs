@@ -1,3 +1,49 @@
+## 2.4.1 — 2026-10-27
+
+**The V15/V16 surface: no API change, and two kinds of stale metadata that no
+guard in either repo could see.**
+
+Regenerated from the chain after V15 (multiplet collect optimisation) and V16
+(`FVT|C>UNSTALED` events) deployed. **442 entrypoints and 447 previews, both
+unchanged** — neither round added or removed a client-facing call. `surfaceHash`
+`56f3f7f008117146` → `473598a1536ce019`.
+
+### Changed — 103 preview module hashes
+
+`AQP-INFO` was redeployed, so every preview that lives in it carries a new
+`moduleHash`. Nothing about what they compute moved; the hash is how a client
+knows the module it is pricing against is the one it was told about.
+
+### Changed — 89 entrypoint ownership orderings
+
+Across all seven Talos modules (TS01-C1 22, TS02-C1 21, TS02-C2 21, TS02-C3 20,
+TS01-C3 3, TS01-C2 1, TS01-C4 1), the `ownership.requires` list is reordered to
+put `patron` first, following the patron/executor/executee position canon.
+
+**The required account SET is identical in all 89 — verified, not assumed.**
+Comparing the published 2.4.0 tarball against this snapshot: 89 differ, 89 have
+the same set of accounts, 0 have a different one. So no client has to collect a
+signature it was not already collecting, which is what makes this a PATCH rather
+than a breaking change. The per-requirement field churn (`via`, `subject`,
+`reader`, `meaning`) is the consequence of comparing position by position after a
+reorder, not independent drift.
+
+### Why this sat unpublished
+
+Both guards on the registry artefact compare it to a **copy of itself**:
+`sync-registry.mjs --check` diffs the package snapshot against
+`Deploy/OURONET-REGISTRY.json`, and `_pkgsync.py` does the same from the other
+side. The artefact had been regenerated, the package snapshot synced from it, and
+both then reported "in sync" — truthfully, and about the wrong question.
+`_registrylive.py` asks the chain but covers the twelve module **hashes**, all of
+which were genuinely current. **Nothing in either repo compares the snapshot to
+what is on npm**, so a published package can be arbitrarily stale while every
+check passes.
+
+What settled it was `npm pack @ouronet/talos-registry@2.4.0` and a semantic diff
+against the working copy. Until a guard does that automatically, treat
+"in sync" as "the two local copies agree".
+
 ## 2.4.0 — 2026-10-25
 
 **The Ouronet V14 surface: two one-way latches, and a preview that should have shipped with V13.**
