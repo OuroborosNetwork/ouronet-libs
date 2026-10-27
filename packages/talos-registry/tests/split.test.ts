@@ -30,8 +30,11 @@ describe("absence means do not split", () => {
   });
 
   it("the vast majority of the surface is unclassified, which is the safe default", () => {
+    // 26 list routes as of 2.7.0 (the six AQP drain/vacate slices joined). `splittable` counts
+    // LIST routes only -- the 8 architectural and 2 cursor routes are real splits a client does
+    // not perform by cutting, so they are deliberately not in this number.
     const classified = entrypointKeys().filter(k => splitPlan(k).splittable);
-    expect(classified.length).toBe(20);
+    expect(classified.length).toBe(26);
     expect(classified.length).toBeLessThan(entrypointKeys().length / 10);
   });
 });

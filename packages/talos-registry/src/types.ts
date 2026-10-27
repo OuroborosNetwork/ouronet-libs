@@ -110,6 +110,22 @@ export interface Partition {
   /** `architectural` only — the twin's step count, checked against the twin itself. */
   steps?: number;
   /**
+   * `list` only — a parameter whose VALUE MUST NOT BE SPLIT across batches. Every element
+   * sharing a `groupBy` value stays in ONE transaction.
+   *
+   * The AQP vacate slices are what this exists for. Their per-beneficiary unwind is UNGATED and
+   * is fed that slice's partial sum: two of its six legs are delta-based and add up correctly,
+   * but the other four are a settle triple that would then run once per SLICE instead of once
+   * per BENEFICIARY. The sibling DRAIN path gates that same triple behind
+   * `UR_AQP|UserUnn == 0` precisely so it fires once; vacate does not, which is the evidence
+   * that its design assumes a beneficiary never spans two slices.
+   *
+   * So this constrains WHERE a cut may fall, not whether one may happen. Checked to be the axis
+   * itself or one of its lockstep companions — a key not positional against the axis cannot
+   * define a boundary in it.
+   */
+  groupBy?: string;
+  /**
    * Parameters POSITIONAL against `axis`, which must be cut WITH it. The failure mode here is
    * silent rather than loud: two arrays that line up by LENGTH and are misaligned move the wrong
    * amount to the wrong place, and the contract has no way to object.

@@ -26,6 +26,11 @@ export interface SplitPlan {
   via: string | null;
   /** `cursor` -- the reads that report progress; drive the pager until they say done */
   progress: string[];
+  /**
+   * `list` -- a parameter whose value must not be split across batches. Elements sharing a value
+   * here stay in one transaction. Null when any cut position is allowed.
+   */
+  groupBy: string | null;
   /** `architectural` -- the twin's step count */
   steps: number | null;
   /** the list parameter that gets cut */
@@ -62,7 +67,7 @@ export function splitPlan(key: string): SplitPlan {
   const p = ep.execution.partition;
   if (!p) {
     return {
-      key, kind: null, shape: null, via: null, progress: [], steps: null,
+      key, kind: null, shape: null, via: null, progress: [], steps: null, groupBy: null,
       axis: null, lockstep: [], inner: null, leaves: null,
       splittable: false, parallel: false, rounds: null, reason: null,
       warnings: [
@@ -79,7 +84,7 @@ export function splitPlan(key: string): SplitPlan {
   if (p.kind === "cursor") {
     return {
       key, kind: "cursor", shape: null, via: p.via ?? null, progress: p.progress ?? [],
-      steps: null, axis: null, lockstep: [], inner: null, leaves: null,
+      steps: null, groupBy: null, axis: null, lockstep: [], inner: null, leaves: null,
       splittable: false, parallel: false, rounds: null, reason: p.reason,
       warnings: [
         `CURSOR ROUTE. This call takes no list -- the work it traverses lives in chain state, so ` +
@@ -95,7 +100,7 @@ export function splitPlan(key: string): SplitPlan {
   if (p.kind === "architectural") {
     return {
       key, kind: "architectural", shape: null, via: p.via ?? null, progress: [],
-      steps: p.steps ?? null, axis: null, lockstep: [], inner: null, leaves: null,
+      steps: p.steps ?? null, groupBy: null, axis: null, lockstep: [], inner: null, leaves: null,
       splittable: false, parallel: false, rounds: null, reason: p.reason,
       warnings: [
         `ARCHITECTURAL ROUTE. The split is into ${p.steps ?? "?"} ORDERED PHASES intrinsic to ` +
@@ -112,6 +117,13 @@ export function splitPlan(key: string): SplitPlan {
         "in, so one pass does NOT complete the operation. Parallel WITHIN a round, strictly " +
         "sequential BETWEEN rounds, and the next round's arguments do not exist until this one " +
         "lands on chain -- they cannot be armed in advance.",
+    );
+  }
+  if (p.groupBy) {
+    warnings.push(
+      `GROUP BOUNDARY on '${p.groupBy}'. Elements sharing a value there must stay in ONE ` +
+        "transaction -- a cut inside a group is unsound, not merely suboptimal. " +
+        "`splitCallByCapacity` honours it; a hand-rolled cut will not.",
     );
   }
   if (p.lockstep?.length) {
@@ -134,7 +146,7 @@ export function splitPlan(key: string): SplitPlan {
   const axis = p.axis!;
   return {
     key, kind: "list", shape: p.shape ?? null, via: null, progress: [], steps: null,
-    axis, lockstep: p.lockstep ?? [], inner,
+    groupBy: p.groupBy ?? null, axis, lockstep: p.lockstep ?? [], inner,
     leaves: (vals) => countLeaves(axis, inner?.axis ?? null, vals),
     splittable: true, parallel: p.shape === "partition",
     rounds: p.rounds ?? null, reason: p.reason, warnings,
@@ -320,7 +332,13 @@ export function splitCallByCapacity(
   // `capacity` each, because evenSlices balances rather than filling.
   if (!plan.inner) {
     if (outer.length === 0) return [{ ...values }];
-    return splitCall(key, values, Math.ceil(outer.length / capacity));
+    if (!plan.groupBy) return splitCall(key, values, Math.ceil(outer.length / capacity));
+    // A GROUP BOUNDARY overrides the even split: a balanced cut would happily fall inside a
+    // group, which for the vacate slices is the one position that is unsound rather than merely
+    // suboptimal. So pack by group, and let a batch run over capacity only when a SINGLE group
+    // exceeds it -- splitting that group would be worse than one oversized transaction, and the
+    // caller's own probe will refuse it loudly.
+    return packByGroup(values, plan, outer.length, capacity, g => g.length);
   }
 
   const innerAxis = plan.inner.axis;
@@ -354,6 +372,12 @@ export function splitCallByCapacity(
   /** One call carrying the outer elements `[from, to)`, unchanged. */
   const groupOf = (from: number, to: number) => splitSlice(values, plan, from, to);
 
+  if (plan.groupBy) {
+    // Same rule in two dimensions: never cut inside a group, and size groups by LEAF count.
+    return packByGroup(values, plan, outer.length, capacity,
+                       (g) => g.reduce((a, i) => a + (nested[i] as unknown[]).length, 0));
+  }
+
   const out: Record<string, unknown>[] = [];
   let start = 0;
   let running = 0;
@@ -378,6 +402,76 @@ export function splitCallByCapacity(
   }
   if (start < outer.length) out.push(groupOf(start, outer.length));
   return out.length ? out : [{ ...values }];
+}
+
+/**
+ * PACK WHOLE GROUPS, NEVER CUTTING INSIDE ONE.
+ *
+ * `groupBy` names a key whose elements must share a transaction. Contiguity is NOT assumed -- the
+ * same value may appear at non-adjacent indices, and a preflight is under no obligation to sort --
+ * so groups are collected by value and emitted as index sets. That means a batch's indices need
+ * not be a contiguous range, which is why this builds each call from an explicit index list
+ * rather than a `[from, to)` slice.
+ *
+ * ORDER WITHIN A GROUP IS PRESERVED, and groups are emitted in order of first appearance, so the
+ * result is still readable back against the input even though it is no longer a straight
+ * partition of ranges.
+ *
+ * A SINGLE GROUP OVER CAPACITY IS EMITTED ALONE AND OVERSIZED, deliberately -- and it falls out
+ * of the ordinary rule rather than needing a branch. Splitting it is the one thing the
+ * declaration forbids, and an over-capacity transaction fails loudly at simulation while a cut
+ * inside a group fails silently and wrongly.
+ */
+function packByGroup(
+  values: Readonly<Record<string, unknown>>, plan: SplitPlan, n: number, capacity: number,
+  weigh: (indices: number[]) => number,
+): Record<string, unknown>[] {
+  const keyArr = values[plan.groupBy!];
+  if (!Array.isArray(keyArr) || keyArr.length !== n) {
+    throw new RegistryError(
+      `${plan.key}: groupBy '${plan.groupBy}' must be an array of length ${n}, got ` +
+        `${Array.isArray(keyArr) ? keyArr.length : typeof keyArr}`);
+  }
+  const groups = new Map<string, number[]>();
+  for (let i = 0; i < n; i++) {
+    const g = JSON.stringify(keyArr[i]);
+    const at = groups.get(g);
+    if (at) at.push(i); else groups.set(g, [i]);
+  }
+  const out: Record<string, unknown>[] = [];
+  let bucket: number[] = [];
+  let running = 0;
+  for (const idx of groups.values()) {
+    const w = weigh(idx);
+    // NO SPECIAL CASE FOR AN OVERSIZED GROUP, and the absence is deliberate. One was written
+    // here -- flush, then emit the group alone -- and mutation testing showed deleting it
+    // changed no outcome, because the ordinary rule already produces exactly that: a group
+    // heavier than `capacity` overflows whatever is accumulating, flushes it, then overflows
+    // again on the next group and is emitted on its own. A branch that cannot change a result
+    // is not a guard, it is something a later reader has to verify and will believe.
+    if (running + w > capacity && bucket.length) {
+      out.push(pickIndices(values, plan, bucket)); bucket = []; running = 0;
+    }
+    bucket = bucket.concat(idx);
+    running += w;
+  }
+  if (bucket.length) out.push(pickIndices(values, plan, bucket));
+  return out.length ? out : [{ ...values }];
+}
+
+/** One call carrying exactly the outer elements at `indices`, axis and companions together. */
+function pickIndices(
+  values: Readonly<Record<string, unknown>>, plan: SplitPlan, indices: readonly number[],
+): Record<string, unknown> {
+  const pick = (arr: unknown[]) => indices.map(i => arr[i]);
+  const out: Record<string, unknown> = {
+    ...values, [plan.axis!]: pick(values[plan.axis!] as unknown[]),
+  };
+  for (const comp of plan.lockstep) {
+    const v = values[comp];
+    if (Array.isArray(v)) out[comp] = pick(v);
+  }
+  return out;
 }
 
 /** Outer slice `[from, to)` of `values`, cutting the axis and every outer companion together. */

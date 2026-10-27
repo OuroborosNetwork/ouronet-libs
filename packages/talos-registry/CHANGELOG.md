@@ -1,3 +1,77 @@
+## 2.7.0 — 2026-10-27
+
+**`partition.groupBy` — a cut POSITION can be unsound even when the split is.
+And the six AQP drain/vacate slices are classified, by reading the exec.**
+
+`surfaceHash` `ab8e2031f3fc0be5` -> `2e2bfa3eb1273dc7`. 442 entrypoints and 447
+previews unchanged. **36 routes: 26 `list`, 8 `architectural`, 2 `cursor`.**
+
+### Resolved — the six AQP batch drain/vacate slices
+
+Held back in 2.5.0 pending an owner ruling. No ruling was needed; the exec
+answers it, and **the two families are not the same case.**
+
+**DRAIN x3 — safe to cut anywhere.** Their `INFO_` text misleads: it says settle
+fires *"only for beneficiaries fully drained THIS ROUND"*, which reads as a
+per-call condition. The implementation is
+
+```pact
+(if (= (ref-AQP::UR_AQP|UserUnn pool-id beneficiary-id) 0) ...settle... (UC_EmptyOc))
+```
+
+— a test on the **resulting state** after this call's legs decrement `unn`, not
+on whether this call carried all of them. A beneficiary with 10 legs cut 5/5
+goes 10->5 (no settle) then 5->0 (settle): **exactly once, order-independent**,
+whichever batch lands last. So cutting mid-beneficiary is fine.
+
+**VACATE x3 — cuttable only on a beneficiary boundary.**
+`XI_1|Vacate*UnwindFromLegs` calls the per-beneficiary unwind once per unique
+beneficiary **in that slice, ungated**, fed
+`UC_VacateSumAmountForBeneficiaryFromLegs` — that slice's partial sum. Two of
+the unwind's six legs are genuinely delta-based
+(`XE_*BeneficiaryRollup ... amount false`, `XE_Apply*StakeDelta ... amount false`)
+so partial sums add up. The other four are the settle triple — and **the drain
+path gates that same triple behind `UserUnn == 0` precisely so it fires once.**
+Vacate does not. That asymmetry is the evidence: the vacate design assumes a
+beneficiary never spans two slices.
+
+### Added — `groupBy`
+
+A parameter whose value must not be split across batches; every element sharing
+it stays in one transaction. It constrains **where** a cut may fall, not whether
+one may happen — a distinction neither `axis` nor `lockstep` could express, and
+without it `axis: owner-ids` would happily cut between two legs of the same
+beneficiary, which is the one position the vacate is unsound.
+
+`splitCallByCapacity` honours it in both dimensions. **Contiguity is not
+assumed** — the same value may appear at non-adjacent indices and a preflight is
+under no obligation to sort — so groups are collected by value and emitted as
+index *sets*, which is why each call is built from an explicit index list rather
+than a range. Order within a group is preserved and groups are emitted in order
+of first appearance.
+
+Checked to be the axis itself or one of its lockstep companions: a key not
+positional against the axis cannot define a boundary in it. Three new generator
+rules, each negative-tested.
+
+### Removed — a branch that could not change a result
+
+A special case emitted an over-capacity group alone. Mutation testing showed
+deleting it changed no outcome: the ordinary rule already produces exactly that,
+because a group heavier than `capacity` overflows whatever is accumulating,
+flushes it, then overflows again and is emitted on its own. A branch that cannot
+change a result is not a guard — it is something a later reader has to verify
+and will believe instead.
+
+### Verified
+
+Seven mutations of the group packer all fail the suite, including two that only
+started failing after the tests were corrected: **every earlier group test used
+the FLAT vacate variant**, so the nested path's boundary check was never
+exercised; and **every overflow fixture coincided with an oversized group**,
+handled by a different branch, so the ordinary flush never ran. Three 2-leg
+groups against a capacity of 3 was the case that needed writing.
+
 ## 2.6.0 — 2026-10-27
 
 **`partition.kind` — a split is LIST-based, CURSOR-based or ARCHITECTURAL, and
