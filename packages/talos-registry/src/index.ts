@@ -15,6 +15,11 @@ export { buildCall, buildPreviewCall, buildGhostCall } from "./build.js";
 export type { BuildOptions } from "./build.js";
 export { planCall, explainCall } from "./plan.js";
 export type { CallPlan } from "./plan.js";
+// MAY this call be split, and along which parameter -- and the splitter that does it. Kept here
+// rather than in each consumer because the consuming app had four hand-rolled copies naming the
+// parameters as string literals, and one call site with no cut at all.
+export { splitPlan, splitCall, splitCallByCapacity } from "./split.js";
+export type { SplitPlan } from "./split.js";
 export { parseCapability, parseCapabilities, capabilityRecipe } from "./caps.js";
 export type { ParsedCapability, CapabilityRecipe } from "./caps.js";
 export { formatForType, formatDecimal, formatInteger, formatString, formatBool } from "./format.js";

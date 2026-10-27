@@ -1,3 +1,191 @@
+## 2.5.0 — 2026-10-27
+
+**`execution.partition` — whether an operation may be split across transactions,
+and along which parameter. Absence means do not split.**
+
+`surfaceHash` `473598a1536ce019` → `65c983178cb70985`. **442 entrypoints and 447
+previews, both unchanged** — no call gained, lost or altered a parameter. The
+hash moved because twenty entries gained a new `execution.partition` block.
+
+**2.4.1 WAS NEVER PUBLISHED.** It is committed, and npm went `2.4.0` → `2.5.0`.
+Its content is included here: the 103 preview module hashes from the `AQP-INFO`
+redeploy and the 89 ownership-clause reorderings, all with identical required
+account sets. Folding rather than publishing twice, since nothing consumed 2.4.1.
+
+### Added — `execution.partition`, and `splitPlan` / `splitCall`
+
+A client splitting a large call needs two different facts, and only one of them
+is in the registry:
+
+| question | answered by |
+|---|---|
+| does this call NEED splitting? | **simulation** — gas is state-dependent, per selection, per block |
+| may this call BE split at all? | **this field** — a property of the operation, fixed by its contract |
+
+Neither can answer the other. A simulation cannot tell you that halving a
+liquidity deposit prices it differently; this field cannot tell you that today's
+420 nonces bust the budget.
+
+**ABSENCE MEANS DO NOT SPLIT.** 16 of 442 entries carry a block; the other 426
+are UNCLASSIFIED, and `splitCall` throws on them rather than defaulting to
+allow. That default is the entire safety property — a wrong permission silently
+converts an ATOMIC operation into a partially-applied one, and nothing
+downstream can detect it. 105 entrypoints take a list parameter, so list-ness is
+not the question; a reading of the operation is.
+
+**TWO SHAPES, not one boolean.** `partition` means cutting the axis yields
+pieces whose combined effect equals the single call — one round, submit
+together. `reduction` means each piece yields a NEW intermediate that must be
+fed back in: merging 860 nonces 123 at a time leaves 7, which are merged again.
+Parallel WITHIN a round, strictly sequential BETWEEN rounds, and the next
+round's arguments **do not exist** until the current one lands, because
+`VST.XIv_MergeNonces` mints at `(+ 1 nonces-used)`.
+
+One boolean would collapse those, and this project has already paid for that
+exact conflation: the `p` recipe suffix was overloaded to mean
+"multi-transaction" rather than "parallel", and a strictly sequential cursor
+pager ended up wearing a prefix promising parallel safety
+(`StoicSyntax-Prefixes.md`, CORRECTION 2026-09-14).
+
+**`lockstep` is orthogonal to both** — the parameters POSITIONAL against the
+axis, cut with it. This is the quiet failure: two arrays that line up by LENGTH
+and are misaligned move the wrong amount to the wrong place, and the contract
+cannot object. `splitCall` derives companion slices from the axis boundaries
+once, so they cannot drift by even one element, and **refuses a length mismatch
+rather than padding or truncating** — the tempting repair is precisely what
+produces a misaligned pair.
+
+`splitCall` exists because the alternative is what the consuming app actually
+did: four components each hand-rolling the same cut with parameter names written
+as string literals, and a fifth call site (collectable unstake) with no cut at
+all because nobody noticed it was missing.
+
+### Added — a SECOND splittable level, `inner`
+
+Cutting the outer axis of a multi-bulk transfer yields fewer TOKENS per
+transaction and does nothing about one token carrying 1,000 recipients. Owner,
+2026-10-27: *"if i add a manifest for 100 tokens, each with 1000+ recipients,
+the UI should be able to create as many individual txes as needed."* That is
+100,000 legs, and one dimension cannot express it — splitting the token axis
+alone gives 100 single-token calls of 1,000 legs each, every one still far too
+large.
+
+So `partition.inner` names the outer companions whose PER-ELEMENT arrays are cut
+as well, and **the unit became the LEAF leg**: a 2-token call whose tokens hold
+900 and 100 recipients is a 1,000-leg transaction, not a 2-leg one. Sizing by
+outer length is precisely the mistake that makes "split it in two" produce one
+transaction that still does not fit.
+
+`splitCallByCapacity(key, values, capacity)` is the function a manifest needs.
+It packs whole outer elements while the running leaf total fits, and emits an
+oversized element ALONE with its inner arrays cut into `ceil(legs / capacity)`
+pieces. Order is preserved throughout, so concatenating every emitted call
+reproduces the input exactly — chosen over an optimal bin-pack deliberately:
+being able to read the plan back against what the user submitted is worth more
+than the occasional saved transaction. `capacity` comes from MEASUREMENT and
+never from the registry.
+
+The invariant that makes a hand-written nested declaration checkable: every
+`inner` name must be a NESTED list (`[[...]]`) **and** must already be the outer
+axis or one of its outer companions. An inner axis pointing at a list that is
+not indexed by the outer one cuts along the **wrong dimension**, and every
+resulting transaction would be internally consistent and wrong. Eight new check
+rules, each negative-tested.
+
+Six entries gained a second level: `DPTF|C_MultiBulkTransfer` (recipients within
+a token), and `DPOF`/`DPSF`/`DPNF`/`DPDC` `C_BulkTransfer` plus
+`DPDC|C_MultiTransfer` (nonces within a recipient or a token).
+
+### Added — four Hydra fed slices that had no axis
+
+`CCp_BackfillScoreSlice`, `Cp_DrainScoreSlice`, `CCp_FvtFixSlice`,
+`CCp_StakeSpecialCustodial`. All four are `indirect-parallel`, so the registry
+already said their slices are order-independent — but **not which parameter is
+the slice**, which a consumer needs before it may cut one. The consuming app was
+already cutting `CCp_FvtFixSlice`'s `users` from a hardcoded parameter name.
+
+Each is justified from the contract's own `INFO_` text rather than inspection:
+*"PRICED PER HOLDER, matching the execution path exactly"*, *"the sequential
+fixer it parallelises"*, *"IDENTICAL IGNIS TO AN ORDINARY ORTO STAKE … the SAME
+phase chain"*.
+
+### Held — six AQP batch drain/vacate slices, deliberately unclassified
+
+`CCp_BatchDrain{TrueFungible,OrtoFungible,Collectable}` and
+`CCp_BatchVacate{TrueFungible,OrtoFungible,Collectables}` look like clean
+per-leg fan-outs and are not obviously so. `BatchDrain`'s own `INFO_` reads
+*"settle-on-last-drain only for beneficiaries fully drained THIS ROUND (live
+UserUnn)"* — a **cross-leg condition**, so splitting one beneficiary's legs
+across two transactions changes when, or whether, the settle fires. The vacate
+trio carries a *"per-beneficiary score unwind"* with the same open question.
+
+It probably converges, since `UserUnn` reaches zero only after the last leg
+whichever order they land in. "Probably converges" is not the standard for a
+permission that silently turns an atomic operation into a partially-applied one,
+and these are the ops that move staked assets out of a pool. Unclassified costs
+a client nothing today: the slice still comes from the `URH_` preflight that
+already bounds it.
+
+### Unchanged by design
+
+`Cp_WipeSlice` (×3) gets no block — its slicer is ON CHAIN
+(`URHC_BuildWipeSlicePlan`, named in `fedParams.slicedBy`), so a client asks for
+slices rather than inventing them. The three cursor pagers
+(`CCp_SweepRecomputeChunk`, `CCp_InjectFixChunk`, `CCp_UnstaleAll`) get none
+either: they take a chunk SIZE, not a list, and firing two concurrently races
+the stored cursor — a partition block there would be a licence to do the one
+thing they forbid.
+
+### Classified — 20 entrypoints
+
+**Partition (12):** `DPTF|C_BulkTransfer`, `C_MultiTransfer`,
+`C_MultiBulkTransfer`; `DPOF`/`DPSF`/`DPNF`/`DPDC` `C_BulkTransfer`;
+`DPDC|C_MultiTransfer`; and the four AQP collectable stake/unstake calls.
+
+**Reduction (4):** `VST|C_Merge`, `C_Slumber`, `C_RepurposeMerge`,
+`C_RepurposeSlumber` — all four route through `XIv_MergeNonces`, which wipes the
+inputs and mints ONE nonce carrying the amount-weighted mean unlock time.
+
+Rounds are **exact, not approximate**: the weight is
+`Σ(balance × stu) / Σbalance`, a true weighted mean, and round 1 mints an
+ABSOLUTE release date, so wall-clock passing between rounds does not shift it.
+The only drift is `floor()` to whole seconds, once per round, under a second
+each.
+
+**`C_MultiBulkTransfer` has TWO valid axes** and only the outer is declared.
+Splitting by `id-lst` cuts whole tokens out, keeping each token's recipient set
+intact. Splitting one token's `executee-array` across transactions is also
+sound, and is deliberately NOT declared, because which a client should prefer is
+a product decision — and an undeclared axis is safer than a guessed one.
+
+**Deliberately unclassified: the SWP liquidity and pool-issue ops.** Their legs
+are priced against pool state an earlier batch has already moved, and the 40%
+deviation ceiling is evaluated per call, so a split is a *different* operation
+rather than a finer-grained one. They have 3-step defpact twins for exactly
+this, reachable through `preferInstead`. A test asserts they stay unclassified.
+
+### Verified
+
+The claim is hand-authored, in `OURONET-REGISTRY.authored.json`, alongside ghost
+values and for the same reason: a contract states that a parameter is a list,
+never that cutting it is equivalent. The SEMANTIC half is a human reading and is
+attributed as one, in `reason`.
+
+The SHAPE half is mechanical and is checked. `_registry.py --check` is fatal in
+the gate and rejects: an axis that is not a parameter, an axis or companion that
+is not list-typed, a companion repeating the axis, a bogus shape, a reduction
+with no `rounds`, a partition WITH `rounds`, a missing `reason`, an authored
+block that failed to merge — and **ORPHANS**, an entry naming an entrypoint that
+no longer exists. That last rule is borrowed rather than invented:
+`_patronslots.py` carried five entries that had outlived their sites, and
+because a vanished site is simply skipped by a scan, they were never consulted
+again while the tool reported success. All eleven rules were negative-tested by
+breaking the data and watching the check fail.
+
+18 new tests; all seven mutations of the splitter were verified to fail it,
+including the two that matter most — unclassified defaulting to splittable, and
+a length mismatch being truncated instead of refused.
+
 ## 2.4.1 — 2026-10-27
 
 **The V15/V16 surface: no API change, and two kinds of stale metadata that no

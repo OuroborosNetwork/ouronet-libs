@@ -46,6 +46,71 @@ export interface Continuation {
   gas: string;
 }
 
+/**
+ * HOW A CALL MAY BE SPLIT ACROSS TRANSACTIONS.
+ *
+ * Present only when the operation has actually been READ and a judgement recorded. ABSENCE MEANS
+ * DO NOT SPLIT: a consumer that finds no `partition` sends one transaction or refuses, and never
+ * guesses. That default is the safety property -- a wrong permission silently converts an ATOMIC
+ * operation into a partially-applied one, and no assertion downstream can detect it.
+ *
+ * The block is hand-authored (`Deploy/OURONET-REGISTRY.authored.json`) for the same reason ghost
+ * values are: a contract states that a parameter is a list, never that cutting that list in half
+ * yields the same outcome as one call. The generator's `--check` verifies the SHAPE of the claim
+ * against the signature -- axis and lockstep names exist and are list-typed, no orphans -- but the
+ * semantic half is a human reading and is attributed as one, in `reason`.
+ *
+ * WHETHER a split is NEEDED is a different question, answered by simulation and not by this field.
+ * Gas is state-dependent; splittability is not.
+ */
+export interface Partition {
+  /**
+   * `partition` -- cutting `axis` yields pieces whose combined effect equals the single call.
+   *               One round, order-independent, submit them all at once.
+   * `reduction`  -- each piece yields a NEW intermediate that must be fed back in (merging 860
+   *               nonces 123 at a time leaves 7, which are merged again). Parallel WITHIN a
+   *               round, strictly sequential BETWEEN rounds, and the next round's arguments do
+   *               not exist until the current one lands on chain.
+   *
+   * Two members rather than one boolean, deliberately: this repo has already paid for that
+   * conflation once, when the `p` recipe suffix was overloaded to mean "multi-transaction"
+   * rather than "parallel" and a strictly sequential cursor pager ended up wearing a prefix
+   * that promised parallel safety (StoicSyntax-Prefixes.md, CORRECTION 2026-09-14).
+   */
+  shape: "partition" | "reduction";
+  /** the list-typed parameter that is cut. Guaranteed by `--check` to exist and be a list. */
+  axis: string;
+  /**
+   * Parameters POSITIONAL against `axis`, which must be cut WITH it. The failure mode here is
+   * silent rather than loud: two arrays that line up by LENGTH and are misaligned move the wrong
+   * amount to the wrong place, and the contract has no way to object.
+   */
+  lockstep?: string[];
+  /**
+   * A SECOND SPLITTABLE LEVEL, present when the axis's companions are NESTED lists.
+   *
+   * `C_MultiBulkTransfer` is the clearest case: `id-lst` is a token list, and for each token
+   * `executee-array[i]` is that token's whole recipient list. Cutting the outer axis yields
+   * fewer TOKENS per transaction, and a single token with 1,000 recipients can still be far too
+   * large -- so the inner level cuts that one token's recipient list as well. A manifest of 100
+   * tokens with 1,000 recipients each is 100,000 legs and needs both levels to be expressible.
+   *
+   * `axis` and `lockstep` here name OUTER parameters whose per-element arrays are cut in step;
+   * every one must be a nested list (`[[...]]`) and must already be the outer axis or one of its
+   * outer companions, so the two levels cannot describe unrelated parameters. The generator
+   * checks exactly that.
+   */
+  inner?: {
+    axis: string;
+    lockstep?: string[];
+    note: string;
+  };
+  /** `reduction` only, and required there -- how the next round's input is obtained. */
+  rounds?: string;
+  /** why this split is sound. An unexplained permission to split is not one. */
+  reason: string;
+}
+
 export interface Execution {
   mode: ExecutionMode;
   shape?: string;
@@ -66,6 +131,8 @@ export interface Execution {
   supportedNote?: string;
   /** the reader that computes this call's required capabilities */
   capabilityPreflight?: string;
+  /** how this call may be split across transactions. ABSENT MEANS DO NOT SPLIT -- see `Partition`. */
+  partition?: Partition;
 }
 
 export interface OwnershipClause {
