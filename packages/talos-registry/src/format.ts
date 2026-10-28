@@ -51,10 +51,65 @@ export function formatBool(v: unknown): string {
   return v ? "true" : "false";
 }
 
-/** Pact object literal: `{ "k": v, ... }`. Keys are always quoted strings. */
+/**
+ * A reference to an object carried in the transaction's `data`, rendered `(read-msg 'name)`.
+ *
+ * The object-typed sibling of `{ readKeyset: "ks" }`, and it exists for the same reason: some
+ * arguments are not literals. Added 2026-10-28.
+ */
+export interface MsgRef { readMsg: string }
+
+/**
+ * Pact object literal: `{ "k": v, ... }` — OR a `(read-msg 'name)` reference.
+ *
+ * ──────────────────────────────────────────────────────────────────────────────────────────────
+ * WHY AN OBJECT ARGUMENT SOMETIMES MUST NOT BE A LITERAL
+ * ──────────────────────────────────────────────────────────────────────────────────────────────
+ * Inline rendering is correct when every field's Pact type survives a JS round trip. It does for
+ * `object{SwapperV5.FeeSplit}` — `{target:string, value:integer}` — which is the only object
+ * argument any Ouronet client passes today, and it renders correctly.
+ *
+ * It is WRONG for `object{SwapperUsageV4.Slippage}`:
+ *
+ *     (defschema Slippage
+ *         expected-output-amount:decimal
+ *         output-precision:integer
+ *         slippage-percent:decimal
+ *     )
+ *
+ * Two decimals and an integer — and `formatLoose` below, which renders object FIELDS, is
+ * documented as *"best-effort … where no declared type is available"*. It cannot know those
+ * types: the registry carries a parameter's type (`object{SwapperUsageV4.Slippage}`) but not the
+ * named schema's FIELD types. So a whole-number `expected-output-amount` renders as the integer
+ * `5` where the schema declares `decimal`, and JavaScript cannot even express the difference —
+ * `5.0 === 5`, so the trailing zero is gone before this function sees the value.
+ *
+ * AND THE DEEPER REASON IS PROVENANCE, not formatting. A `Slippage` is CONSTRUCTED BY THE CHAIN
+ * (`SWPU.UDC_SpawnSlippageBounds`), read into the client, and handed straight back. Re-serialising
+ * a chain-produced value through a JS literal formatter is a round trip through a lossy encoding
+ * for no benefit; putting it in the transaction's `data` returns the chain its own JSON. That is
+ * why the deployed templates render `(read-msg 'slippage-bounds)`.
+ *
+ * ──────────────────────────────────────────────────────────────────────────────────────────────
+ * ADDITIVE, SO THE ONE EXISTING CONSUMER IS UNTOUCHED
+ * ──────────────────────────────────────────────────────────────────────────────────────────────
+ * A STRING (or `{ readMsg }`) means "this argument lives in the transaction data under that
+ * name". An OBJECT still renders inline, exactly as before. `C_UpdateSpecialFeeTargets` keeps
+ * working with no change, because it passes objects and its schema has no decimal field.
+ *
+ * The caller chooses, because only the caller knows whether its value came from the chain. The
+ * alternative — refusing every object with a decimal field — needs schema field types the
+ * registry does not carry, and inventing them here would be guessing about a contract.
+ */
 function formatObject(v: unknown, type: string): string {
+  // `(read-msg 'name)` — the object travels in the transaction's data under this key.
+  if (typeof v === "string") return `(read-msg '${v})`;
+  if (v && typeof v === "object" && typeof (v as MsgRef).readMsg === "string")
+    return `(read-msg '${(v as MsgRef).readMsg})`;
   if (v === null || typeof v !== "object" || Array.isArray(v))
-    throw new RegistryError(`Expected an object for ${type}, got ${JSON.stringify(v)}`);
+    throw new RegistryError(
+      `Expected an object for ${type}, or the NAME of a transaction-data key to pass it as ` +
+        `(read-msg '<name>'). Got ${JSON.stringify(v)}.`);
   const body = Object.entries(v as Record<string, unknown>)
     .map(([k, val]) => `${formatString(k)}: ${formatLoose(val)}`)
     .join(", ");
