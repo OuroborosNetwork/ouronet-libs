@@ -1,3 +1,73 @@
+## 2.10.0 — 2026-10-28
+
+**An object argument may be passed as `(read-msg 'name)`.**
+
+`surfaceHash` unchanged (`2e2bfa3eb1273dc7`), 442 entrypoints, 447 previews. The
+generated registry is untouched; this is `formatObject`, and it could not render one
+of the argument types the registry already declares.
+
+### What could not be expressed
+
+`SwapInterface`'s two WITH-slippage variants take
+`slippage-bounds: object{SwapperUsageV4.Slippage}`:
+
+```pact
+(defschema Slippage
+    expected-output-amount:decimal
+    output-precision:integer
+    slippage-percent:decimal
+)
+```
+
+Two decimals and an integer. Object FIELDS are rendered by `formatLoose`, whose own
+doc comment says *"best-effort for values inside an untyped object, where no declared
+type is available"* — and it cannot know those types, because the registry carries a
+PARAMETER's type but not the named schema's FIELD types. Measured, all three ways of
+passing it were wrong:
+
+| passed | rendered | verdict |
+|---|---|---|
+| `{"expected-output-amount": 5, …}` | `{ "expected-output-amount": 5, … }` | integer literal where `decimal` is declared |
+| `{"expected-output-amount": 5.0, …}` | `{ "expected-output-amount": 5, … }` | JavaScript has no `5.0`; the zero is gone before the formatter sees it |
+| `{"expected-output-amount": {decimal: "5.0"}, …}` | `{ "expected-output-amount": { "decimal": "5.0" }, … }` | that is the capability-argument encoding, not Pact object syntax |
+
+### And the deeper reason is PROVENANCE, not formatting
+
+A `Slippage` is **constructed by the chain** (`SWPU.UDC_SpawnSlippageBounds`), read
+into the client, and handed straight back. Re-serialising a chain-produced value
+through a JS literal formatter is a round trip through a lossy encoding for no
+benefit; putting it in the transaction's `data` returns the chain its own JSON. That
+is why the deployed templates render `(read-msg 'slippage-bounds)`.
+
+### Additive, so nothing existing changes
+
+A **string** (or `{ readMsg: "name" }`) means *"this argument lives in the
+transaction data under that name"*. An **object** still renders inline, exactly as
+before.
+
+That matters because there IS one live consumer: `C_UpdateSpecialFeeTargets` passes
+`[object{SwapperV5.FeeSplit}]`, whose schema is `{target:string, value:integer}` —
+no decimal, so inline rendering is correct for it and it needs no edit. Measured
+across all four of OuronetUI's spec files, it is the **only** object argument any
+Ouronet client passes.
+
+The caller chooses, because only the caller knows whether its value came from the
+chain. The alternative — refusing every object with a decimal field — needs schema
+field types this registry does not carry, and inventing them here would be guessing
+about a contract.
+
+This mirrors the existing guard convention exactly: a `guard` takes the NAME of a
+data key and renders `(read-keyset "<name>")`, with `{ readKeyset }` as the explicit
+form. `{ readMsg }` is its object-typed sibling.
+
+### Tests
+
+`tests/msg-ref.test.ts`. Three mutants — strings no longer becoming `read-msg`, the
+symbol form becoming a quoted string, and every object becoming a `read-msg` and so
+breaking the one existing consumer — all die. Two of them initially "survived"
+because the mutation script had a quoting error and never applied; a surviving mutant
+is a claim about the mutant, and that claim has to be checked too.
+
 ## 2.9.0 — 2026-10-28
 
 **`STOA_SIGNATURES` carries the contract's whole `C_` surface: 9 entries -> 18.**
