@@ -22,10 +22,15 @@
  *     538 lines importing nothing but `@stoachain/stoa-core`.
  *
  * The rest of the engine still reaches into its host for a wallet context, a query cache, redux
- * and a toast library — ~10 touchpoints over ~8,800 lines. Lifting those before inverting them
+ * and a toast library, across ~8,800 lines in nine files. Lifting those before inverting them
  * would not move the engine; it would COPY it, and a copy is the thing this package exists to
  * end. §4.3 of the spec measures each one; P2 inverts them in place, where the consuming suite
  * can prove behaviour is unchanged, and P3 lifts what P2 has freed.
+ *
+ * (This said "~10 touchpoints" until 2026-10-28. The count was of call sites of four named
+ * facilities, and it missed react, host components and every transitive edge — which made four
+ * of the nine files read as portable when none of them are. The spec's table is measured by a
+ * test now, not maintained by hand.)
  *
  * So the honest description of v0.1.0 is: **the parts that were already portable, plus the name.**
  * The version here is what a Papyrus badge displays, so publishing it is what makes that badge

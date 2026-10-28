@@ -26,12 +26,17 @@ imports at all) and the **batch planner** (plan, fit, verify and split a multi-t
 538 lines importing nothing but `@stoachain/stoa-core`).
 
 The rest of the engine still reaches into its host for a wallet context, a query cache, redux and
-a toast library — about ten touchpoints across ~8,800 lines. Lifting those before inverting them
-would not *move* the engine, it would **copy** it, and a copy is the thing this package exists to
-end: the engine was implemented three times across two repositories before this, and nobody
-noticed for a year because nothing on screen said which one you were in. `PAPYRUS_ENGINE_SPEC.md`
-§4.3 measures each coupling; P2 inverts them in place where the consuming test suite can prove
-behaviour is unchanged, and P3 lifts what P2 has freed.
+a toast library, across ~8,800 lines in nine files. Lifting those before inverting them would not
+*move* the engine, it would **copy** it, and a copy is the thing this package exists to end: the
+engine was implemented three times across two repositories before this, and nobody noticed for a
+year because nothing on screen said which one you were in. `PAPYRUS_ENGINE_SPEC.md` §4.3 measures
+each coupling; P2 inverts them in place where the consuming test suite can prove behaviour is
+unchanged, and P3 lifts what P2 has freed.
+
+*(An earlier wording here counted "about ten touchpoints". That number was retired on 2026-10-28:
+it counted call sites of four named facilities and missed react, host components and every
+transitive edge, which made four of the nine files read as portable when none of them are. §4.3
+is now measured by a test rather than by eye.)*
 
 So the honest description of v0.1.0 is **the parts that were already portable, plus the name** —
 and the name matters more than it sounds. `PAPYRUS_VERSION` is what a Papyrus badge renders, so
