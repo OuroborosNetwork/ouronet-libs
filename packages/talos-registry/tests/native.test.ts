@@ -7,7 +7,8 @@
  * the emitted Pact is not a refactor.
  */
 import { describe, expect, it } from "vitest";
-import { buildCall, buildNativeCall, composeCalls, nativeSignature, RegistryError } from "../src/index.js";
+import { buildCall, buildNativeCall, composeCalls, nativeSignature, RegistryError,
+         STOA_SIGNATURES } from "../src/index.js";
 
 describe("buildNativeCall", () => {
   it("emits exactly what the hand-written UrStoa templates emit", () => {
@@ -90,6 +91,59 @@ describe("buildNativeCall", () => {
 
   it("refuses a key neither surface describes", () => {
     expect(() => buildNativeCall("arweave.upload", {})).toThrow(RegistryError);
+  });
+});
+
+describe("the table is the CONTRACT's surface, not the consumers' wish list", () => {
+  /**
+   * It held nine entries, and the nine were the ones somebody had asked for. That is not the
+   * same thing as a surface, and the difference was live: the first leg of every
+   * "create the destination, then act" composite was missing, and so were the UR `Anew`
+   * variants — while a spec document cited `coin.C_UR|TransferAnew` FROM THIS TABLE as evidence
+   * the surface was covered. The entry it actually matched was `C_TransferAnew`, the non-UR one.
+   *
+   * Completeness cannot be asserted here: the Pact source lives in another repository. What CAN
+   * be asserted is that every entry is BUILDABLE and that the families are whole — a create
+   * without its UR twin, or a transfer without its `Anew`, is the shape the gap took last time.
+   */
+  it("carries all 18 of the contract's C_ entrypoints", () => {
+    // EIGHTEEN, and the first draft of this assertion said seventeen -- a hand count of the
+    // list being written, which is exactly the kind of number this file exists to stop anyone
+    // trusting. The test failed on its own author before it failed on anything else.
+    expect(Object.keys(STOA_SIGNATURES)).toHaveLength(18);
+  });
+
+  it("has no half-family: every create, rotate and transfer has its UR twin", () => {
+    for (const base of ["C_CreateAccount", "C_RotateAccount", "C_Transfer", "C_TransferAnew",
+                        "C_Transmit", "C_TransmitAnew"]) {
+      expect(STOA_SIGNATURES[`coin.${base}`], `coin.${base}`).toBeTruthy();
+      expect(STOA_SIGNATURES[`coin.C_UR|${base.slice(2)}`], `coin.C_UR|${base.slice(2)}`)
+        .toBeTruthy();
+    }
+  });
+
+  it("builds every one of them from ghost values", () => {
+    // A signature nothing can render is a row, not a surface. Each type gets a value its
+    // formatter accepts; a guard gets a data-key NAME, which is the only form it has.
+    for (const [key, params] of Object.entries(STOA_SIGNATURES)) {
+      const args = Object.fromEntries(params.map(([n, t]) => [n,
+        t === "decimal" ? 1.5 : t === "guard" ? "ks" : t === "integer" ? 1 : "k:aa"]));
+      const call = buildNativeCall(key, args);
+      expect(call, key).toContain(key);
+      expect(call, `${key} must not be namespaced`).not.toMatch(/ouronet-ns/);
+    }
+  });
+
+  it("renders every guard parameter as a read-keyset, never as a literal", () => {
+    const withGuard = Object.entries(STOA_SIGNATURES)
+      .filter(([, ps]) => ps.some(([, t]) => t === "guard"));
+    // Nine of the eighteen take one; if that count moves, the table changed shape.
+    expect(withGuard).toHaveLength(9);
+    for (const [key, params] of withGuard) {
+      const args = Object.fromEntries(params.map(([n, t]) => [n,
+        t === "decimal" ? 1.0 : t === "guard" ? "ks" : "k:aa"]));
+      expect(buildNativeCall(key, args), key).toContain('(read-keyset "ks")');
+    }
   });
 });
 

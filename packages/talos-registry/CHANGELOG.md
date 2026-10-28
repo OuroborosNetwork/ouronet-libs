@@ -1,3 +1,47 @@
+## 2.9.0 — 2026-10-28
+
+**`STOA_SIGNATURES` carries the contract's whole `C_` surface: 9 entries -> 18.**
+
+`surfaceHash` unchanged (`2e2bfa3eb1273dc7`), 442 entrypoints, 447 previews. The
+generated registry is untouched; this is the HAND-WRITTEN native table, and it was
+short.
+
+### What it held, and why nine was the wrong nine
+
+The nine entries were the ones a consumer had asked for. That is not a surface, and
+the difference was live in three places at once:
+
+- **`coin.C_CreateAccount` and `coin.C_UR|CreateAccount` were absent** — the first
+  leg of every "create the destination, then act" composite in OuronetUI. A consumer
+  needing one had no choice but a hand-written Pact string, which is the thing this
+  package exists to end.
+- **`coin.C_UR|TransferAnew` / `C_UR|TransmitAnew` were absent** — what the UrStoa
+  transfer needs. And `PAPYRUS_ENGINE_SPEC.md` §2.5.4 cited `coin.C_UR|TransferAnew`
+  **from this table** as evidence the surface was already covered. The entry it
+  actually matched was `C_TransferAnew`, the non-UR one. **A near-name is how a gap
+  reads as a presence.**
+- **Nothing could report the shortfall**, because nothing compares this table to the
+  contract — the Pact sources are in another repository. They still are. So every
+  entry now carries its source LINE, which is the audit trail: re-derive with
+  `grep -n "(defun C_" coin-live.pact`, which is how the list was built.
+
+### Added
+
+`C_CreateAccount` · `C_RotateAccount` · `C_TransferAcross` · `C_UR|CreateAccount` ·
+`C_UR|RotateAccount` · `C_UR|TransferAnew` · `C_UR|TransmitAnew` · `C_URV|Inject` ·
+`C_URV|CoinbaseInject`
+
+### Asserted
+
+Completeness against the contract cannot be checked from here, so what is checked is
+what can be: all 18 build from ghost values through `buildNativeCall`, none renders a
+namespace, each of the 9 guard parameters renders as `(read-keyset "...")` and never
+as a literal, and **no family is half-present** — every create, rotate, transfer and
+`Anew` has its `UR` twin. A missing twin is the shape the gap took last time.
+
+The count assertion failed on its author first: the table was written with a hand
+count of 17 against a real 18. 585 -> 589 tests.
+
 ## 2.8.0 — 2026-10-28
 
 **`buildNativeCall` — the registry can now describe a call it does not contain.**

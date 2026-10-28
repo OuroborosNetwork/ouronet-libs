@@ -201,14 +201,44 @@ export const isPlaceholder = (rendered: string): boolean => rendered === PLACEHO
  * resolve to two modules. Guessing wrong here would price a call on the wrong chain.
  */
 
-/** StoaChain's root-namespace `coin`.  source: 0_Stoa/coin-contract/coin-live.pact */
+/**
+ * StoaChain's root-namespace `coin`.  source: `0_Stoa/coin-contract/coin-live.pact`
+ *
+ * COMPLETED 2026-10-28 — all 18 `C_` entrypoints, read off the contract rather than added as
+ * each consumer asked for one. It held NINE, and the nine were the ones somebody had needed so
+ * far, which is a different thing from a surface. Three consequences were live at that moment:
+ *
+ *   - `coin.C_CreateAccount` and `coin.C_UR|CreateAccount` were absent, and they are the first
+ *     leg of every "create the destination, then act" composite in OuronetUI.
+ *   - `coin.C_UR|TransferAnew` / `C_UR|TransmitAnew` were absent, which is what `TransferUrStoa`
+ *     needs — and `PAPYRUS_ENGINE_SPEC.md` §2.5.4 QUOTED `coin.C_UR|TransferAnew` from this
+ *     table as evidence the surface was covered. The entry it actually read was
+ *     `C_TransferAnew`, the non-UR one. A near-name is how a gap reads as a presence.
+ *   - Nothing could say the table was short, because nothing compares it to the contract. It
+ *     still cannot: the Pact sources live in another repository. So the line references below
+ *     are the audit trail — re-derive with `grep -n "(defun C_" coin-live.pact`, which is how
+ *     this list was built.
+ */
 export const STOA_SIGNATURES: Readonly<Record<string, ReadonlyArray<[string, string]>>> = {
+  // Account lifecycle. The guard is ALWAYS `(read-keyset "<name>")` — see `formatForType`.
+  "coin.C_CreateAccount": [["account", "string"], ["guard", "guard"]],                                // :577
+  "coin.C_RotateAccount": [["account", "string"], ["new-guard", "guard"]],                             // :580
+  // STOA.
   "coin.C_Transfer":      [["sender", "string"], ["receiver", "string"], ["amount", "decimal"]],      // :583
-  "coin.C_Transmit":      [["sender", "string"], ["receiver", "string"], ["amount", "decimal"]],      // :593
   "coin.C_TransferAnew":  [["sender", "string"], ["receiver", "string"], ["receiver-guard", "guard"], ["amount", "decimal"]], // :586
+  "coin.C_TransferAcross":[["sender", "string"], ["receiver", "string"], ["receiver-guard", "guard"], ["target-chain", "string"], ["amount", "decimal"]], // :589
+  "coin.C_Transmit":      [["sender", "string"], ["receiver", "string"], ["amount", "decimal"]],      // :593
   "coin.C_TransmitAnew":  [["sender", "string"], ["receiver", "string"], ["receiver-guard", "guard"], ["amount", "decimal"]], // :599
+  // UrStoa — a SEPARATE account table, hence its own create/rotate rather than reusing the above.
+  "coin.C_UR|CreateAccount": [["account", "string"], ["guard", "guard"]],                              // :1060
+  "coin.C_UR|RotateAccount": [["account", "string"], ["new-guard", "guard"]],                          // :1068
   "coin.C_UR|Transfer":   [["sender", "string"], ["receiver", "string"], ["amount", "decimal"]],      // :1075
+  "coin.C_UR|TransferAnew":[["sender", "string"], ["receiver", "string"], ["receiver-guard", "guard"], ["amount", "decimal"]], // :1080
   "coin.C_UR|Transmit":   [["sender", "string"], ["receiver", "string"], ["amount", "decimal"]],      // :1085
+  "coin.C_UR|TransmitAnew":[["sender", "string"], ["receiver", "string"], ["receiver-guard", "guard"], ["amount", "decimal"]], // :1090
+  // The UrStoa Vault.
+  "coin.C_URV|Inject":    [["account", "string"], ["stoa-amount", "decimal"]],                         // :1364
+  "coin.C_URV|CoinbaseInject": [["account", "string"], ["stoa-amount", "decimal"]],                    // :1372
   "coin.C_URV|Stake":     [["account", "string"], ["urstoa-amount", "decimal"]],                      // :1407
   "coin.C_URV|Unstake":   [["account", "string"], ["urstoa-amount", "decimal"]],                      // :1439
   "coin.C_URV|Collect":   [["account", "string"]],                                                    // :1467
