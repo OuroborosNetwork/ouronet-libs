@@ -1,5 +1,6 @@
 import { formatForType } from "./format.js";
 import { getEntrypoint, namespace, RegistryError, registry } from "./registry.js";
+import { isOffRegistryKey } from "./tooltip.js";
 import type { Entrypoint } from "./types.js";
 
 export interface BuildOptions {
@@ -35,6 +36,20 @@ export function buildCall(
   args: Record<string, unknown>,
   opts: BuildOptions = {},
 ): string {
+  /**
+   * A NATIVE KEY IS A DIFFERENT MISTAKE FROM A STALE ONE, so it gets a different sentence.
+   * `coin.C_URV|Stake` is real, callable and simply not on Ouronet's surface -- it is
+   * StoaChain's own root-namespace contract. Left to `getEntrypoint` it reports "the name is
+   * stale or the module is not deployed", which sends the reader to look for a deploy that was
+   * never going to exist. The prefix stays "Unknown entrypoint" because that is what it is.
+   */
+  if (isOffRegistryKey(key))
+    throw new RegistryError(
+      `Unknown entrypoint "${key}" -- it is a CHAIN-NATIVE call, not an Ouronet one, so no ` +
+        `namespace is prefixed and the generated registry does not describe it. ` +
+        `Use buildNativeCall.`,
+    );
+
   const ep = getEntrypoint(key);
 
   if (ep.source === "repo-only") {

@@ -1,3 +1,56 @@
+## 2.8.0 — 2026-10-28
+
+**`buildNativeCall` — the registry can now describe a call it does not contain.**
+
+`surfaceHash` unchanged (`2e2bfa3eb1273dc7`), 442 entrypoints, 447 previews. Nothing
+was regenerated: this release is three functions over data that has been published
+here, typed, since the tooltip canon landed.
+
+### The gap
+
+`buildCall` names `ouronet-ns.<key>` and reads the generated registry, so it can only
+describe Ouronet's surface. Three operations in OuronetUI are not on it at all —
+UrStoa stake, unstake and collect execute `coin.C_URV|Stake` / `|Unstake` /
+`|Collect`, **StoaChain's own root-namespace contract**, with no `ouronet-ns`
+entrypoint anywhere. They were the last carriers of that app's modal migration whose
+blocker was not a feature of the form but the plain fact that *nothing could describe
+the call*, so each one kept a hand-written Pact template in `@ouronet/ouronet-core`.
+
+The gap was also MIS-SIZED, as "a generator plus a table", after a search of a
+different artefact — the consumer's own `pactSignatures.generated.ts`, which is
+generated from the Ouronet sources and so is correctly Ouronet-only.
+`STOA_SIGNATURES` and `KADENA_SIGNATURES` have been right here the whole time, with
+names AND types, and `formatForType` already renders every type they use, guards
+included.
+
+### What landed
+
+- **`buildNativeCall(key, args)`** — by name, rendered in the contract's declared
+  order, **no namespace prefixed** (the native contract is root; `ouronet-ns.coin.…`
+  would name a module that does not exist and fail as a resolution error on chain).
+  Emits byte-for-byte what the hand-written templates emit, which is asserted against
+  them.
+- **`nativeSignature(key)`** — the declared parameters, or `undefined`. Resolves
+  through `chainOf`, which REFUSES a key declared for both chains rather than picking:
+  both chains call their contract `coin`, and building against the wrong one is the
+  kind of wrong that looks right.
+- **`composeCalls(calls)`** — a transaction body is a sequence of forms, so a
+  composite is a join. Written down because each consumer re-derived it and one has to
+  be read twice to see whether the create comes before the collect.
+- **`buildCall` now names the mistake.** A native key used to reach `getEntrypoint`
+  and be reported as *"the name is stale or the module is not deployed"*, sending the
+  reader to look for a deploy that was never going to exist. It now says the key is a
+  chain-native call and points at `buildNativeCall`, keeping the `Unknown entrypoint`
+  prefix so a caller matching on it still matches.
+
+### A surviving mutant wrote one of the tests
+
+Replacing `params.map` with `Object.keys(args).map` — rendering in whatever order the
+caller typed — **passed every assertion in the new file**, because each supplied its
+arguments in declared order. Transposition is precisely the defect this package exists
+to prevent (`C_ChangeOwnership` moved its pool id to last while keeping its arity), and
+it was undetectable until one object was written out of order on purpose. 584 tests.
+
 ## 2.7.0 — 2026-10-27
 
 **`partition.groupBy` — a cut POSITION can be unsound even when the split is.

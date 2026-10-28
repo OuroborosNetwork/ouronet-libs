@@ -13,6 +13,9 @@ export { registry, surfaceHash, namespace, RegistryError,
          entrypointKeys, modules, entrypointsOfModule, resolveByName } from "./registry.js";
 export { buildCall, buildPreviewCall, buildGhostCall } from "./build.js";
 export type { BuildOptions } from "./build.js";
+// CHAIN-NATIVE calls -- StoaChain's and Kadena's own `coin`, which the generated registry does
+// not describe because it is not Ouronet's surface. Same by-name, by-declared-order contract.
+export { buildNativeCall, nativeSignature, composeCalls } from "./native.js";
 export { planCall, explainCall } from "./plan.js";
 export type { CallPlan } from "./plan.js";
 // MAY this call be split, and along which parameter -- and the splitter that does it. Kept here
