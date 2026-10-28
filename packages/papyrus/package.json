@@ -1,0 +1,47 @@
+{
+  "name": "@ouronet/papyrus",
+  "version": "0.1.0",
+  "description": "The Papyrus Engine \u2014 how an Ouronet transaction is described, priced, split, signed and reported. Shared by OuronetUI and Codex.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "clean": "rimraf dist"
+  },
+  "keywords": [
+    "ouronet",
+    "papyrus",
+    "pact",
+    "kadena",
+    "stoachain",
+    "transaction"
+  ],
+  "peerDependencies": {
+    "@stoachain/stoa-core": ">=4.2.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org",
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OuroborosNetwork/ouronet-libs.git",
+    "directory": "packages/papyrus"
+  },
+  "license": "Apache-2.0"
+}

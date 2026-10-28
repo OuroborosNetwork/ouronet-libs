@@ -1,7 +1,7 @@
 {
   "name": "ouronet-libs",
   "version": "0.0.0",
-  "description": "Ouronet TypeScript stack — workspace root for @ouronet/ouronet-core (Ouronet protocol business logic) and @ouronet/ouronet-codex (modular React Codex layer for consumer apps). Split out of StoaChain/stoa-js in the Phase-4 reorg; the chain-level halves (@stoachain/stoa-core, @stoachain/kadena-stoic-legacy) remain in stoa-chain-libs and are consumed from npm.",
+  "description": "Ouronet TypeScript stack \u2014 workspace root for @ouronet/ouronet-core (Ouronet protocol business logic) and @ouronet/ouronet-codex (modular React Codex layer for consumer apps). Split out of StoaChain/stoa-js in the Phase-4 reorg; the chain-level halves (@stoachain/stoa-core, @stoachain/kadena-stoic-legacy) remain in stoa-chain-libs and are consumed from npm.",
   "private": true,
   "type": "module",
   "engines": {
@@ -11,7 +11,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspace=@ouronet/ouronet-core && npm run build --workspace=@ouronet/ouronet-codex && npm run build:ci --workspace=@ouronet/talos-registry",
+    "build": "npm run build --workspace=@ouronet/ouronet-core && npm run build --workspace=@ouronet/ouronet-codex && npm run build:ci --workspace=@ouronet/talos-registry && npm run build --workspace=@ouronet/papyrus",
     "typecheck": "npm run typecheck --workspaces",
     "test": "npm run test --workspaces",
     "test:watch": "npm run test:watch --workspaces",

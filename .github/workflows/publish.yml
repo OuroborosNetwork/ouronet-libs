@@ -102,7 +102,7 @@ jobs:
                 "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=npm%3Aregistry.npmjs.org" \
                 | python3 -c 'import sys,json;print(json.load(sys.stdin)["value"])')
           MISSING=0
-          for PKG in "@ouronet%2fouronet-core" "@ouronet%2fouronet-codex" "@ouronet%2ftalos-registry"; do
+          for PKG in "@ouronet%2fouronet-core" "@ouronet%2fouronet-codex" "@ouronet%2ftalos-registry" "@ouronet%2fpapyrus"; do
             CODE=$(curl -sS -o /tmp/exchange.json -w '%{http_code}' -X POST \
                    -H "Authorization: Bearer ${TOK}" -H "Content-Type: application/json" \
                    "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/${PKG}")
@@ -148,14 +148,16 @@ jobs:
           CORE_VERSION=$(node -p "require('./packages/ouronet-core/package.json').version")
           CODEX_VERSION=$(node -p "require('./packages/ouronet-codex/package.json').version")
           TALOS_VERSION=$(node -p "require('./packages/talos-registry/package.json').version")
-          echo "Tag: $TAG_VERSION | ouronet-core: $CORE_VERSION | ouronet-codex: $CODEX_VERSION | talos-registry: $TALOS_VERSION"
+          PAPYRUS_VERSION=$(node -p "require('./packages/papyrus/package.json').version")
+          echo "Tag: $TAG_VERSION | ouronet-core: $CORE_VERSION | ouronet-codex: $CODEX_VERSION | talos-registry: $TALOS_VERSION | papyrus: $PAPYRUS_VERSION"
 
-          PUBLISH_CORE="false"; PUBLISH_CODEX="false"; PUBLISH_TALOS="false"
+          PUBLISH_CORE="false"; PUBLISH_CODEX="false"; PUBLISH_TALOS="false"; PUBLISH_PAPYRUS="false"
           [ "$TAG_VERSION" = "$CORE_VERSION" ]  && PUBLISH_CORE="true"
           [ "$TAG_VERSION" = "$CODEX_VERSION" ] && PUBLISH_CODEX="true"
           [ "$TAG_VERSION" = "$TALOS_VERSION" ] && PUBLISH_TALOS="true"
+          [ "$TAG_VERSION" = "$PAPYRUS_VERSION" ] && PUBLISH_PAPYRUS="true"
 
-          if [ "$PUBLISH_CORE" = "false" ] && [ "$PUBLISH_CODEX" = "false" ] && [ "$PUBLISH_TALOS" = "false" ]; then
+          if [ "$PUBLISH_CORE" = "false" ] && [ "$PUBLISH_CODEX" = "false" ] && [ "$PUBLISH_TALOS" = "false" ] && [ "$PUBLISH_PAPYRUS" = "false" ]; then
             echo "::error::Tag $TAG_VERSION matches no package (ouronet-core=$CORE_VERSION, ouronet-codex=$CODEX_VERSION, talos-registry=$TALOS_VERSION)."
             exit 1
           fi
@@ -163,11 +165,13 @@ jobs:
           echo "PUBLISH_OURONET_CORE=$PUBLISH_CORE"   >> "$GITHUB_OUTPUT"
           echo "PUBLISH_OURONET_CODEX=$PUBLISH_CODEX" >> "$GITHUB_OUTPUT"
           echo "PUBLISH_TALOS_REGISTRY=$PUBLISH_TALOS" >> "$GITHUB_OUTPUT"
+          echo "PUBLISH_PAPYRUS=$PUBLISH_PAPYRUS" >> "$GITHUB_OUTPUT"
           echo "TAG_VERSION=$TAG_VERSION"             >> "$GITHUB_OUTPUT"
           echo "── Publish queue ──"
           echo "  @ouronet/ouronet-core:   $PUBLISH_CORE"
           echo "  @ouronet/ouronet-codex:  $PUBLISH_CODEX"
           echo "  @ouronet/talos-registry: $PUBLISH_TALOS"
+          echo "  @ouronet/papyrus:        $PUBLISH_PAPYRUS"
 
       # Each queued package's own README + CHANGELOG must reference the shipping
       # version — they're what npmjs.com renders.
@@ -178,6 +182,9 @@ jobs:
           QUEUED=()
           [ "${{ steps.queue.outputs.PUBLISH_OURONET_CORE }}"  = "true" ] && QUEUED+=("packages/ouronet-core")
           [ "${{ steps.queue.outputs.PUBLISH_OURONET_CODEX }}" = "true" ] && QUEUED+=("packages/ouronet-codex")
+          # papyrus follows the core/codex doc shape deliberately -- it is a release log, not a
+          # generated-surface reference, so it has no reason for talos-registry's exception below.
+          [ "${{ steps.queue.outputs.PUBLISH_PAPYRUS }}" = "true" ] && QUEUED+=("packages/papyrus")
 
           # talos-registry is checked on its CHANGELOG only, and deliberately.
           # Its README is a generated-surface reference, not a release log: the
@@ -325,6 +332,23 @@ jobs:
           EOF
           npm publish --access public --provenance ${DIST} --userconfig "${RUNNER_TEMP}/.npmrc"
           rm -f "${RUNNER_TEMP}/.npmrc"
+
+      # papyrus has no ordering constraint against the other three: nothing in this repo
+      # depends on it yet, and it peer-deps only `@stoachain/stoa-core` from outside.
+      - name: Publish @ouronet/papyrus
+        working-directory: packages/papyrus
+        if: github.ref_type == 'tag' && steps.queue.outputs.PUBLISH_PAPYRUS == 'true'
+        run: |
+          V="${{ steps.queue.outputs.TAG_VERSION }}"
+          # A PRERELEASE MUST NOT TAKE `latest` -- see the talos-registry step.
+          DIST=""
+          case "${V}" in *-*) DIST="--tag next";; esac
+
+          if npm view @ouronet/papyrus@${V} version >/dev/null 2>&1; then
+            echo "@ouronet/papyrus@${V} already on npm — skipping (idempotent)."
+          else
+            npm publish --access public --provenance ${DIST}
+          fi
 
       - name: Create GitHub Release for the pushed tag
         if: github.ref_type == 'tag'
