@@ -262,15 +262,27 @@ describe("<CreateKadenaSeedModal> — Stoic path", () => {
       fireEvent.change(screen.getByPlaceholderText(/type brand-new dalos seed words/i), {
         target: { value: "alpha bravo charlie delta" },
       });
-      await waitFor(() => expect(screen.getByText(/key #0 preview/i)).toBeTruthy());
+      /**
+       * THE SAME GENEROUS TIMEOUT ITS SIBLING ALREADY CARRIES, and this test was the one that
+       * omitted it. Every wait below gates on REAL cryptography -- `seedWordsToBitString`, two
+       * key derivations, and a `smartDecrypt` envelope whose KDF is deliberately expensive --
+       * not on a React re-render, so the default 1,000ms is a bet on the machine.
+       *
+       * It came due on 2026-10-28: green on every developer machine, FAILED in CI at 1,552ms
+       * with "expected <div role=dialog> to be null" -- the modal had not finished persisting
+       * yet. The assertion was right and the clock was wrong, and it blocked an unrelated
+       * package's release, which is what makes a timing flake expensive rather than annoying.
+       */
+      await waitFor(() => expect(screen.getByText(/key #0 preview/i)).toBeTruthy(),
+        { timeout: 15_000 });
 
       fireEvent.change(screen.getByPlaceholderText(/my seed/i), { target: { value: "My New Stoic Seed" } });
 
       const addButton = screen.getByRole("button", { name: /^add seed$/i }) as HTMLButtonElement;
-      await waitFor(() => expect(addButton.disabled).toBe(false));
+      await waitFor(() => expect(addButton.disabled).toBe(false), { timeout: 15_000 });
       fireEvent.click(addButton);
 
-      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+      await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull(), { timeout: 15_000 });
 
       const created = captured.find((s) => s.name === "My New Stoic Seed");
       expect(created).toBeTruthy();
