@@ -9,7 +9,16 @@ hover hint → Papyrus (price · simulate · lock in · split) → sign → subm
 
 ## Status
 
-`0.1.0` on public npmjs — the first slice, and deliberately a small one.
+`0.1.1` on public npmjs — the first slice, and deliberately a small one.
+
+**v0.1.1** makes the batch planner reachable. `planBatchesVerified` — the function that does
+the *verifying* in "plan, fit, verify and split" — shipped inside `dist/batch.js` in v0.1.0 and
+was left off the hand-curated index, while the two types that exist only to describe its
+argument and its result *were* exported. Because `exports` admits `.` alone, that made it
+unreachable by any path rather than merely undocumented, and the first consumer to wire the
+package found out by failing to import the planner its three batched flows are built on.
+`tests/surface.test.ts` now compares the index against every module's actual exports, so the
+curation may reorder and annotate freely and may not omit.
 
 **v0.1.0** carries only what has **zero host couplings today**, measured rather than assumed: the
 **vocabulary** (the three members of the family and the engine's own version — a file with no
@@ -44,7 +53,8 @@ those states apart either.
 
 ```ts
 import { PAPYRUS_VERSION, PAPYRUS_COPY, type PapyrusKind } from "@ouronet/papyrus";
-import { planStakeBatches, fitGasModel, perBatchPerNonce } from "@ouronet/papyrus";
+import { planBatchesVerified, planStakeBatches } from "@ouronet/papyrus";
+import { fitGasModel, perBatchPerNonce } from "@ouronet/papyrus";
 ```
 
 **The batch planner plans by MEASUREMENT, not by division.** The requirement it implements,

@@ -47,6 +47,10 @@ export {
   fitGasModel,
   type GasModel,
   type GasSample,
+  // Planning by MEASUREMENT: probe candidate batches and return only a plan whose largest
+  // batch was simulated under the ceiling. This is the planner the batched flows actually
+  // call; `planStakeBatches` above is the synchronous ESTIMATOR it replaced.
+  planBatchesVerified,
   // Recovering from a refusal that names a ceiling.
   isGasLimitExceededMessage,
   planFromExceededProbe,

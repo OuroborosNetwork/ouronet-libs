@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.1.1 — 2026-10-28
+
+**`planBatchesVerified` is exported. In 0.1.0 it was not, and that made it unreachable.**
+
+`package.json` `exports` admits `"."` alone — a deliberate choice, so that the surface is one
+curated list rather than whatever file layout `dist/` happens to have. The cost of that choice is
+that `index.ts` is not documentation, it is the **boundary**: a symbol missing from it cannot be
+imported by any path, no matter that it is sitting in `dist/batch.js` with its types alongside.
+
+0.1.0's index exported `ProbeOutcome` and `VerifiedBatchPlan` — the argument type and the result
+type of `planBatchesVerified` — and not the function between them. So the published surface
+advertised a signature nobody could call. It was found the way these are always found: the first
+consumer wired the package and its three batched flows had nothing to import.
+
+- **`planBatchesVerified` re-exported**, with a comment saying what distinguishes it from the
+  synchronous `planStakeBatches` it replaced: it probes candidate batches and returns a plan only
+  when the plan's **largest** batch was simulated under the ceiling.
+- **`tests/surface.test.ts`** — the index may REORDER and ANNOTATE, and may not OMIT. Runtime
+  exports are compared as module keys, so there is no string matching to fool; types are compared
+  as name sets parsed from sources with comments stripped first, because a name in prose is not a
+  name exported. Both halves were mutation-checked: dropping the function fails two assertions,
+  dropping a type fails one.
+
+A curated list is worth keeping — it is the only place a reader learns the shape of a surface —
+but a hand-kept list of an evolving module falls behind, and this is what makes it safe to keep.
+
 ## 0.1.0 — 2026-10-28
 
 **The first slice of the Papyrus Engine, and deliberately a small one.**

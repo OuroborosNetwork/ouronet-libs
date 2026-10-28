@@ -1,6 +1,6 @@
 {
   "name": "@ouronet/papyrus",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "The Papyrus Engine \u2014 how an Ouronet transaction is described, priced, split, signed and reported. Shared by OuronetUI and Codex.",
   "type": "module",
   "main": "./dist/index.js",
