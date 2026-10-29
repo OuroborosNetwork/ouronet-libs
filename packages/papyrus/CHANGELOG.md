@@ -98,6 +98,31 @@ assertion compares it against the **directory**, which is the one source neither
 behind. It earned its keep immediately: `multistepParamMismatch` was added to `src/` and left off
 the index, and this is what said so.
 
+### THE FIRST `v0.2.0` TAG FAILED ITS GATE, and the reason is this dependency
+
+`@ouronet/papyrus` typechecks against `@ouronet/talos-registry`'s EMITTED DECLARATIONS, and the
+root `typecheck` script ran `npm run typecheck --workspaces` — whose order put papyrus **before**
+talos-registry. In CI, on a fresh checkout, `packages/talos-registry/dist` does not exist yet, so
+papyrus reported `TS2307: Cannot find module '@ouronet/talos-registry'` three times in `src/` and
+three more in `tests/`, plus a cascade of `TS7006` implicit-anys from the untyped import.
+
+**It passed locally and would have gone on passing**, because `dist/` was already sitting there
+from an earlier build — the classic shape of a build-order bug: the machine that has done the work
+before cannot see it. The workflow's own `Typecheck + Build + Test` step carries a comment saying
+*"Build precedes test so any dist-resolved imports exist"*; the same reasoning now applies to
+typecheck, and did not.
+
+Fixed by making the root `typecheck` script build that one package's declarations first:
+
+    "typecheck": "npm run build:ci --workspace=@ouronet/talos-registry && npm run typecheck --workspaces"
+
+Explicit rather than relying on the workflow reordering its steps, because a fresh local clone has
+exactly the same problem and a CI-only fix would leave it there.
+
+**NO npm VERSION WAS BURNED.** The gate runs before npm sees a byte, which is the second time this
+month that ordering has saved a release — the first was `talos-registry@2.10.0`, stopped by the
+docs-parity check for a missing CHANGELOG entry.
+
 ### A NEW PEER DEPENDENCY, and it is a real requirement rather than a formality
 
 `@ouronet/talos-registry >= 2.10.0` joins `@stoachain/stoa-core` in `peerDependencies`. Three of

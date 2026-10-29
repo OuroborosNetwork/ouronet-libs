@@ -12,7 +12,7 @@
   ],
   "scripts": {
     "build": "npm run build --workspace=@ouronet/ouronet-core && npm run build --workspace=@ouronet/ouronet-codex && npm run build:ci --workspace=@ouronet/talos-registry && npm run build --workspace=@ouronet/papyrus",
-    "typecheck": "npm run typecheck --workspaces",
+    "typecheck": "npm run build:ci --workspace=@ouronet/talos-registry && npm run typecheck --workspaces",
     "test": "npm run test --workspaces",
     "test:watch": "npm run test:watch --workspaces",
     "clean": "npm run clean --workspaces"
