@@ -115,7 +115,29 @@ parseCapabilities(strings)    // <(coin.TRANSFER "a" "b" 1.0)> -> signer args
 
 // rendering
 formatForType(value, declaredType)
+pactDecimal(v) / pactInteger(v)   // tag a field INSIDE an object with its Pact type
 ```
+
+**A decimal field inside an object needs `pactDecimal`.** A top-level parameter has its
+declared type and renders correctly; an object's FIELDS do not, because the registry carries a
+parameter's type (`object{X.VacateTfLeg}`) but not the named schema's field types. And
+JavaScript cannot carry the difference — `100.0 === 100` — so an untagged whole-number decimal
+renders as the Pact integer `100`, which the decimal lexer refuses:
+
+```ts
+"tf-lanes": [{ "asset-id": id, legs: legs.map(l => ({
+  "owner-id": l.ownerId, "beneficiary-id": l.beneficiary,
+  balance: pactDecimal(l.balanceRaw),        // "16.800576521961000000000000"
+})) }]
+```
+
+Pass the chain's own digits as a STRING where you have them: Pact decimals carry up to 24
+places and a JS `number` holds about 15 significant digits.
+
+For an object an EXECUTION hands straight back to the chain, prefer `(read-msg 'name)` — pass
+the data key's NAME instead of the object. That avoids the round trip rather than correcting it.
+It is not available on a cost preview, which is issued as a bare code string with no data
+payload, and that is what `pactDecimal` is for.
 
 ### A launchpad buy, end to end
 

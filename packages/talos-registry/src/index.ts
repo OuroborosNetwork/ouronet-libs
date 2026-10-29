@@ -25,7 +25,8 @@ export { splitPlan, splitCall, splitCallByCapacity } from "./split.js";
 export type { SplitPlan } from "./split.js";
 export { parseCapability, parseCapabilities, capabilityRecipe } from "./caps.js";
 export type { ParsedCapability, CapabilityRecipe } from "./caps.js";
-export { formatForType, formatDecimal, formatInteger, formatString, formatBool } from "./format.js";
+export { formatForType, formatDecimal, formatInteger, formatString, formatBool,
+         pactDecimal, pactInteger, type PactTyped } from "./format.js";
 // THE TOOLTIP CANON. Shared implementation rather than a shared document -- see TOOLTIP-CANON.md
 // for why each rule exists, and `tooltip.ts` for the rules themselves.
 export { tooltipModel, tooltipModels, signatureRows, chainOf, isOffRegistryKey,

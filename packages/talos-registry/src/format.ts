@@ -60,6 +60,87 @@ export function formatBool(v: unknown): string {
 export interface MsgRef { readMsg: string }
 
 /**
+ * A VALUE THAT CARRIES ITS OWN PACT TYPE — for a field inside an object literal.
+ *
+ * ──────────────────────────────────────────────────────────────────────────────────────────────
+ * THE DEFECT THIS CLOSES
+ * ──────────────────────────────────────────────────────────────────────────────────────────────
+ * `formatObject` renders an object's FIELDS through `formatLoose`, which has no declared type to
+ * work from — the registry carries a parameter's type (`object{AcquisitionSchemasV3.VCT|
+ * VacateTfLeg}`) but not the named schema's FIELD types. For every type but one that is
+ * harmless. For `decimal` it is not, because JAVASCRIPT CANNOT EXPRESS THE DIFFERENCE:
+ * `100.0 === 100`, so by the time a value reaches this module the trailing zero is gone and a
+ * whole-number decimal is indistinguishable from an integer.
+ *
+ * MEASURED, against `INFO_AQP-POOL|FullVacate`, whose legs declare `balance:decimal`:
+ *
+ *     buildPreviewCall(...)  ->  { "balance": 100 } ... { "balance": 2.5 }
+ *
+ * The second is right and the first is refused by Pact's decimal lexer. So the same code path
+ * works or fails according to the DATA — intermittent by pool, which is the worst available
+ * failure and precisely the kind a casual test passes. It is why OuronetUI ships the whole-pool
+ * vacate with no cost preview rather than with one that usually fails.
+ *
+ * ──────────────────────────────────────────────────────────────────────────────────────────────
+ * WHY THE CALLER DECLARES IT, RATHER THAN THIS PACKAGE DERIVING IT
+ * ──────────────────────────────────────────────────────────────────────────────────────────────
+ * The field types ARE derivable — from the Pact sources' `defschema` forms. But this package
+ * bundles a snapshot of the DEPLOYED surface, and its whole discipline is that deployed code
+ * wins; a repo-sourced schema table would be a second authority inside it, authoritative-looking
+ * and unverified against the chain. So the type travels with the value, chosen at the call site
+ * by the code that knows which schema it is building for.
+ *
+ * That is the same reasoning `formatObject` already applies one level up: *"The caller chooses,
+ * because only the caller knows whether its value came from the chain."*
+ *
+ * ──────────────────────────────────────────────────────────────────────────────────────────────
+ * ADDITIVE
+ * ──────────────────────────────────────────────────────────────────────────────────────────────
+ * An untagged value renders exactly as before. Nothing existing has to change, and a consumer
+ * that tags nothing is in the position it was in — which for an object with no decimal field is
+ * correct, and is why `C_UpdateSpecialFeeTargets` never needed this.
+ */
+export interface PactTyped {
+  /** The Pact type this value must render as. */
+  __pactType: "decimal" | "integer" | "string" | "bool" | "time";
+  value: unknown;
+}
+
+function isPactTyped(v: unknown): v is PactTyped {
+  return !!v && typeof v === "object" && typeof (v as PactTyped).__pactType === "string"
+    && "value" in (v as object);
+}
+
+/**
+ * Tag a value as a Pact `decimal`, so it renders as one INSIDE an object literal.
+ *
+ * `pactDecimal(100)` renders `100.0`; `pactDecimal(2.5)` renders `2.5`. Accepts a STRING too,
+ * which is the lossless form — Pact decimals carry up to 24 places and a JS `number` holds about
+ * 15 significant digits, so a value read from the chain and handed back should travel as the
+ * digits the chain sent:
+ *
+ *     pactDecimal("16.800576521961000000000000")
+ *
+ * Only needed inside objects. A top-level `decimal` parameter already has its declared type and
+ * goes through `formatDecimal` correctly.
+ */
+export function pactDecimal(value: number | string): PactTyped {
+  return { __pactType: "decimal", value };
+}
+
+/**
+ * Tag a value as a Pact `integer`.
+ *
+ * Less often needed than `pactDecimal` — a whole JS number already renders as an integer — but it
+ * makes the intent explicit, and it turns the MIRROR defect into an error: a fractional value in
+ * an integer field currently renders as `2.5` where `integer` is declared, which Pact refuses
+ * after the fact. Tagged, it is refused here, with the value named.
+ */
+export function pactInteger(value: number | string): PactTyped {
+  return { __pactType: "integer", value };
+}
+
+/**
  * Pact object literal: `{ "k": v, ... }` — OR a `(read-msg 'name)` reference.
  *
  * ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -90,6 +171,14 @@ export interface MsgRef { readMsg: string }
  * for no benefit; putting it in the transaction's `data` returns the chain its own JSON. That is
  * why the deployed templates render `(read-msg 'slippage-bounds)`.
  *
+ * RESOLVED 2026-10-29 FOR THE CASES THAT CANNOT USE `read-msg` — see `PactTyped` / `pactDecimal`
+ * above. The escape below works for an EXECUTION, which has a `data` payload; a COST PREVIEW is
+ * issued as a bare code string and has nowhere for the object to travel, so
+ * `INFO_AQP-POOL|FullVacate` could not be priced at all. The field's type now travels with the
+ * value, declared at the call site. The paragraph above still stands for a chain-constructed
+ * object an execution hands straight back: `read-msg` remains the better answer there, because it
+ * avoids the round trip rather than correcting it.
+ *
  * ──────────────────────────────────────────────────────────────────────────────────────────────
  * ADDITIVE, SO THE ONE EXISTING CONSUMER IS UNTOUCHED
  * ──────────────────────────────────────────────────────────────────────────────────────────────
@@ -99,7 +188,11 @@ export interface MsgRef { readMsg: string }
  *
  * The caller chooses, because only the caller knows whether its value came from the chain. The
  * alternative — refusing every object with a decimal field — needs schema field types the
- * registry does not carry, and inventing them here would be guessing about a contract.
+ * registry does not carry, and inventing them here would be guessing about a contract. That last
+ * sentence is still true and is why `pactDecimal` is an OPT-IN at the call site rather than a
+ * table in this package: the types are derivable from the Pact sources, but a repo-sourced table
+ * inside a snapshot of the DEPLOYED surface would be a second authority, authoritative-looking
+ * and unverified against the chain.
  */
 function formatObject(v: unknown, type: string): string {
   // `(read-msg 'name)` — the object travels in the transaction's data under this key.
@@ -116,8 +209,19 @@ function formatObject(v: unknown, type: string): string {
   return `{ ${body} }`;
 }
 
-/** Best-effort for values inside an untyped object, where no declared type is available. */
+/**
+ * Best-effort for values inside an untyped object, where no declared type is available — EXCEPT
+ * where the value brought its own.
+ *
+ * THE CHECK MUST PRECEDE THE OBJECT BRANCH and nothing else, which is worth stating because the
+ * ordering looks load-bearing and mostly is not. A `PactTyped` is an object, so reaching
+ * `formatObject` first would render it as a nested literal `{ "__pactType": "decimal", … }` —
+ * which parses and means something else entirely. It cannot collide with the string, boolean,
+ * number or array branches, so its position among THOSE is immaterial: a mutant moving it down
+ * to sit immediately above the object branch survives, and survives correctly.
+ */
 function formatLoose(v: unknown): string {
+  if (isPactTyped(v)) return formatForType(v.value, v.__pactType);
   if (typeof v === "string") return formatString(v);
   if (typeof v === "boolean") return formatBool(v);
   if (typeof v === "number") return Number.isInteger(v) ? String(v) : formatDecimal(v);

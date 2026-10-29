@@ -1,3 +1,111 @@
+## 2.11.0 — 2026-10-29
+
+**A decimal field inside an object can now be rendered: `pactDecimal` / `pactInteger`.**
+
+`surfaceHash` unchanged (`2e2bfa3eb1273dc7`), 442 entrypoints, 447 previews. The
+generated registry is untouched; this is `formatObject` again, and it is the half of
+2.10.0's problem that `read-msg` cannot reach.
+
+### What 2.10.0 left open
+
+That release resolved the object-with-a-decimal argument by putting the object in the
+transaction's `data` and rendering `(read-msg 'name)` — correct, and better than
+correcting a round trip, for a chain-constructed value an EXECUTION hands straight
+back.
+
+**A cost preview has no `data`.** It is issued as a bare code string against `/local`,
+so there is nowhere for the object to travel. `INFO_AQP-POOL|FullVacate` is the case
+that forced this:
+
+```pact
+(defschema VCT|VacateTfLeg
+    owner-id:string
+    beneficiary-id:string
+    balance:decimal
+)
+```
+
+Measured on a two-leg lane:
+
+```
+(ouronet-ns.AQP-INFO.INFO_AQP-POOL|FullVacate "A" "P"
+  [{ "asset-id": "OURO", "legs": [{ … "balance": 100 } { … "balance": 2.5 }] }] …)
+```
+
+The second is right and the first is refused by Pact's decimal lexer — **and the
+difference is the DATA, not the code path.** A pool whose balances happen to be
+fractional previews fine; one holding a round 100 does not. Intermittent by data is
+the worst available failure, and it is exactly the kind a casual test passes: the
+first draft of OuronetUI's own test used `2.5` and `1.0`, and `1.0` is `1` in
+JavaScript, so it asserted nothing.
+
+Seven vacate/drain entrypoints and four wipe entrypoints are affected. OuronetUI
+currently ships the whole-pool vacate button **with no cost preview at all** rather
+than one that usually fails — see its 2.83.0 notes.
+
+### The type travels with the value
+
+```ts
+import { pactDecimal } from "@ouronet/talos-registry";
+
+buildPreviewCall("TS02-C3.AQP-POOL|CC_FullVacate", {
+  patron, "pool-id": poolId,
+  "tf-lanes": [{ "asset-id": assetId, legs: legs.map(l => ({
+    "owner-id": l.ownerId, "beneficiary-id": l.beneficiary,
+    balance: pactDecimal(l.balanceRaw),          // "16.800576521961000000000000"
+  })) }],
+  "of-lanes": [], "coll-lanes": [], "coll-son": false,
+});
+```
+
+`pactDecimal` accepts a number or a **string**, and the string is the lossless form:
+Pact decimals carry up to 24 places while a JS `number` holds about 15 significant
+digits, so a value read from the chain and handed back should travel as the digits the
+chain sent.
+
+`pactInteger` is its sibling and matters less often — a whole JS number already renders
+as an integer — but it turns the MIRROR defect into an error. Untagged, a fractional
+value in an integer field renders as `2.5` and is refused by the chain after signing;
+tagged, it is refused here, with the value named.
+
+### Why an opt-in and not a table in this package
+
+The field types ARE derivable — from the Pact sources' `defschema` forms, which is how
+the Pact repo's `_ghostshape.py` now checks the ghost layer. But this package bundles a
+snapshot of the **deployed** surface and its whole discipline is that deployed code
+wins. A repo-sourced schema table inside it would be a second authority:
+authoritative-looking, and unverified against the chain.
+
+So 2.10.0's closing sentence still stands — *"inventing them here would be guessing
+about a contract"* — and the type is declared at the call site by the code that knows
+which schema it is building for. Same reasoning as `read-msg`'s: the caller chooses,
+because only the caller knows.
+
+### Additive
+
+An untagged value renders exactly as before, and the first test in the new file
+CHARACTERISES that rather than asserting it away — a whole number still becomes an
+integer. `C_UpdateSpecialFeeTargets`, the one live object-passing consumer
+(`{target:string, value:integer}`, no decimal), needs no edit.
+
+### Tests
+
+`tests/object-field-types.test.ts`, 12 cases: the defect characterised in both its
+whole and fractional forms, `pactDecimal` on numbers, fractions, an exact 24-place
+chain string and an integral string, nesting inside a list of objects, a refusal for a
+non-numeric value, `pactInteger`'s mirror refusal, and the full `INFO_AQP-POOL|
+FullVacate` call rendered both ways. 606 tests green across the package.
+
+Three mutants. Ignoring the tag kills 9 cases; tagging `pactDecimal` as `integer`
+kills 6. The third — moving the tag check down to sit immediately above the object
+branch — **survived, and survives correctly**: a `PactTyped` cannot collide with the
+string, boolean, number or array branches, so its position among those is immaterial.
+What IS load-bearing is that it precede the OBJECT branch, or it would render as a
+nested literal `{ "__pactType": "decimal", … }`, which parses and means something
+else. The comment on `formatLoose` says that rather than claiming the first position
+matters, because a surviving mutant is a claim about the mutant and that claim has to
+be checked too.
+
 ## 2.10.0 — 2026-10-28
 
 **An object argument may be passed as `(read-msg 'name)`.**
