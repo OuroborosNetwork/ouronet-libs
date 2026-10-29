@@ -21,11 +21,34 @@
  * mentioned in prose is not a name exported.
  */
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 
 import * as index from "../src/index.js";
 import * as kind from "../src/kind.js";
 import * as batch from "../src/batch.js";
+// v0.2.0's modules. ADDED TO THE LISTS BELOW TOO — a module imported here but left out of
+// `MODULES` would be checked by nothing, which is the same silence this suite exists to end.
+import * as partition from "../src/partition.js";
+import * as concurrency from "../src/concurrency.js";
+import * as defpactPayer from "../src/defpactPayer.js";
+import * as defpactTwin from "../src/defpactTwin.js";
+import * as multistepSpec from "../src/multistepSpec.js";
+
+/**
+ * THE ONE LIST, so adding a module cannot half-happen. Before v0.2.0 the module set was spelled
+ * THREE times — the imports, the runtime loop and the type loop — and five new modules would have
+ * meant three places to remember. `MODULES` is now the single statement of what this package
+ * contains, and `every src module is covered` below asserts it against the directory.
+ */
+const MODULES: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
+  ["kind.ts", kind],
+  ["batch.ts", batch],
+  ["partition.ts", partition],
+  ["concurrency.ts", concurrency],
+  ["defpactPayer.ts", defpactPayer],
+  ["defpactTwin.ts", defpactTwin],
+  ["multistepSpec.ts", multistepSpec],
+];
 
 const read = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
 
@@ -46,7 +69,7 @@ const reExported = (src: string): string[] =>
     .filter(Boolean);
 
 describe("every runtime export of every module is reachable from the index", () => {
-  for (const [name, mod] of [["kind.ts", kind], ["batch.ts", batch]] as const) {
+  for (const [name, mod] of MODULES) {
     it(`${name}`, () => {
       const missing = Object.keys(mod).filter(k => !(k in index));
       expect(missing, `${name} exports unreachable through the package entry point`).toEqual([]);
@@ -54,15 +77,29 @@ describe("every runtime export of every module is reachable from the index", () 
   }
 
   it("and the index adds nothing of its own that no module provides", () => {
-    const provided = new Set([...Object.keys(kind), ...Object.keys(batch)]);
+    const provided = new Set(MODULES.flatMap(([, m]) => Object.keys(m)));
     expect(Object.keys(index).filter(k => !provided.has(k))).toEqual([]);
+  });
+
+  it("EVERY module in src/ is covered by this suite", () => {
+    /**
+     * The guard on the guard. `MODULES` is hand-kept, so a new file could be added to `src/`,
+     * exported from the index, and checked by nothing — the index would be correct and this
+     * suite would be silently narrower than the package. Compared against the DIRECTORY, which
+     * is the one source neither list can fall behind.
+     */
+    const onDisk = readdirSync(new URL("../src/", import.meta.url))
+      .filter(f => f.endsWith(".ts") && f !== "index.ts")
+      .sort();
+    expect(MODULES.map(([n]) => n).sort(), "tests/surface.test.ts does not cover every src module")
+      .toEqual(onDisk);
   });
 });
 
 describe("every exported TYPE is listed in the index too", () => {
   const listed = new Set(reExported(read("index.ts")));
 
-  for (const file of ["kind.ts", "batch.ts"]) {
+  for (const [file] of MODULES) {
     it(`${file}`, () => {
       const types = declaredTypes(read(file));
       // A module with no exported types would make this test vacuously green, so say so.

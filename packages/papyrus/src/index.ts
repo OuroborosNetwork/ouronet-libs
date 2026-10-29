@@ -69,3 +69,74 @@ export {
   QUICK_PREFILTER_NONCE_COUNT,
   WORST_KNOWN_CALIBRATED_PER_NONCE,
 } from "./batch.js";
+
+/**
+ * ──────────────────────────────────────────────────────────────────────────────────────────────
+ * v0.2.0 — THE MULTI-TRANSACTION VOCABULARY, and driving a defpact
+ * ──────────────────────────────────────────────────────────────────────────────────────────────
+ * Everything below was written in OuronetUI during the Papyrus migration and lifted here on
+ * 2026-10-29, by the same rule v0.1.0 used: only what has ZERO HOST COUPLINGS, measured. Their
+ * imports were, before the lift, `@ouronet/talos-registry` and one host hook each — and the one
+ * host thing they wanted was `PartitionMeta`, which is engine vocabulary and so moved too.
+ *
+ * `defpactPayer.ts` imported NOTHING AT ALL, which is as portable as a file gets.
+ *
+ * WHAT IS STILL NOT HERE, and the measurement rather than a promise: `contDriver.ts` (263 lines)
+ * is the one continuation SENDER in the ecosystem, and it is portable after this release — its
+ * remaining host import, `lib/gas-price.ts`, itself imports nothing but `@stoachain/stoa-core`.
+ * It is held back because it would add `@stoachain/kadena-stoic-legacy` to this package's runtime
+ * surface and because it is the signing path, which wants an integration harness this package
+ * does not have yet. That is a decision, not an oversight; see the CHANGELOG.
+ */
+export {
+  // THE REGISTRY'S SPLIT JUDGEMENT. The host re-exports these so its call sites are unchanged.
+  partitionOf,
+  leafCount,
+  registryCarriesPartitionData,
+  type PartitionMeta,
+} from "./partition.js";
+
+export {
+  // HOW A MULTI-TRANSACTION OPERATION MAY BE RUN — parallel, sequential-free,
+  // sequential-constrained. Owner ruling 2026-10-28.
+  concurrencyOf,
+  type Concurrency,
+  type ConcurrencyVerdict,
+} from "./concurrency.js";
+
+export {
+  // WHO PAYS A DEFPACT'S CONTINUATIONS. Owner ruling 2026-10-29: the payment key of the
+  // currently selected Ouronet account. The gas station CANNOT — `DALOS.GAS_PAYER` binds
+  // `exec-code` eagerly and a `cont` payload has none.
+  defpactPayerVerdict,
+  ASSUMED_STEP_GAS,
+  type DefpactPayerInput,
+  type DefpactPayerVerdict,
+} from "./defpactPayer.js";
+
+export {
+  // IS THIS ENTRYPOINT A DEFPACT, AND HOW MANY STEPS? Read off `execution.mode`/`execution.steps`
+  // on the DOOR — not off the single-shot's `partition.via`, which reaches only 8 of the 10.
+  defpactTwinOf,
+  defpactStepsOf,
+  defpactDoorFor,
+  allDefpactTwins,
+  defpactIndexProblems,
+  __resetDefpactIndex,
+  type DefpactInfo,
+  type DefpactIndexProblem,
+} from "./defpactTwin.js";
+
+export {
+  // THE MULTI-STEP VARIANT OF A SPEC, DERIVED — every door's parameter list is identical to its
+  // single-shot twin's, so it is one field changed rather than a second spec.
+  multistepSpecOf,
+  multistepProblemsFor,
+  // The parameter comparison, exported so the REFUSAL can be exercised: inside
+  // `multistepSpecOf` that branch is unreachable against the real registry, and an unexercised
+  // refusal is indistinguishable from a missing one.
+  multistepParamMismatch,
+  type RepointableSpec,
+  type MultistepDerivation,
+  type MultistepProblem,
+} from "./multistepSpec.js";

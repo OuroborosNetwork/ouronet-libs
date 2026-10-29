@@ -67,7 +67,7 @@
  * from the app that hosts it — once Codex consumes Papyrus too, two apps will show the same
  * Papyrus version and different app versions, and that is the fact a user needs.
  */
-export const PAPYRUS_VERSION = "0.1.1";
+export const PAPYRUS_VERSION = "0.2.0";
 
 export type PapyrusKind = "page" | "roll" | "leaf";
 

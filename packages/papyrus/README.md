@@ -9,7 +9,38 @@ hover hint → Papyrus (price · simulate · lock in · split) → sign → subm
 
 ## Status
 
-`0.1.1` on public npmjs — the first slice, and deliberately a small one.
+`0.2.0` on public npmjs — the multi-transaction vocabulary joins the batch planner.
+
+**v0.2.0** lifts the five modules the Papyrus migration produced, by the same rule v0.1.0 used —
+only what has **zero host couplings, measured**:
+
+- **`partition.ts`** — `PartitionMeta`, `partitionOf`, `leafCount`,
+  `registryCarriesPartitionData`. The registry's own split judgement. It lived in a host hook, and
+  three modules here read it, so leaving it there would have meant importing a host from the
+  package or declaring the shape twice. The host now re-exports these names, so its call sites are
+  unchanged: one definition, two names, which is not what this package exists to end.
+- **`concurrency.ts`** — `parallel` / `sequential-free` / `sequential-constrained`. Owner ruling,
+  2026-10-28. Its own header in OuronetUI said it belonged here and was not here yet; this is that
+  move, made once.
+- **`defpactPayer.ts`** — who funds a defpact's continuation steps. Owner ruling, 2026-10-29:
+  *the payment key of the currently selected Ouronet account*, because `DALOS.GAS_PAYER` binds
+  `exec-code` eagerly and a `cont` payload has none. **It imported nothing at all**, which is as
+  portable as a file gets.
+- **`defpactTwin.ts`** — is this entrypoint a defpact, and how long? Read off `execution.mode` and
+  `execution.steps` on the DOOR. The first version read the single-shot's `partition.via` instead
+  and so found **8 of 10**; the two it could not see are the `MTX-AQP` pair, whose single-shots
+  carry no partition at all. **Its test passed while it was wrong**, because it compared the index
+  against the index's own filter.
+- **`multistepSpec.ts`** — the multi-step variant of a spec, DERIVED. Every door's parameter list
+  is identical to its single-shot twin's (measured, all ten), so it is one field changed rather
+  than a second spec, and the identity is re-checked per call.
+
+**Measured and held back:** `contDriver.ts` — the one continuation SENDER in the ecosystem, 263
+lines — is portable after this release; its last host import, `lib/gas-price.ts`, itself imports
+nothing but `@stoachain/stoa-core`. It stays in OuronetUI for two stated reasons: it would add
+`@stoachain/kadena-stoic-legacy` to this package's runtime surface, and it is the signing path,
+which wants an integration harness this package does not have. A decision, not an oversight.
+
 
 **v0.1.1** makes the batch planner reachable. `planBatchesVerified` — the function that does
 the *verifying* in "plan, fit, verify and split" — shipped inside `dist/batch.js` in v0.1.0 and
