@@ -97,6 +97,14 @@ export {
 } from "./partition.js";
 
 export {
+  // THE JUDGEMENT APPLIED. Cutting a fed slice honours axis, lockstep AND groupBy together --
+  // each one failed alone is a different silent defect, and none of the three fails loudly.
+  sliceFedArgs,
+  type FedSlice,
+  type SliceOutcome,
+} from "./fedslice.js";
+
+export {
   // HOW A MULTI-TRANSACTION OPERATION MAY BE RUN — parallel, sequential-free,
   // sequential-constrained. Owner ruling 2026-10-28.
   concurrencyOf,

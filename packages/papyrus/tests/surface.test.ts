@@ -33,6 +33,8 @@ import * as concurrency from "../src/concurrency.js";
 import * as defpactPayer from "../src/defpactPayer.js";
 import * as defpactTwin from "../src/defpactTwin.js";
 import * as multistepSpec from "../src/multistepSpec.js";
+// v0.3.0
+import * as fedslice from "../src/fedslice.js";
 
 /**
  * THE ONE LIST, so adding a module cannot half-happen. Before v0.2.0 the module set was spelled
@@ -48,6 +50,7 @@ const MODULES: ReadonlyArray<readonly [string, Record<string, unknown>]> = [
   ["defpactPayer.ts", defpactPayer],
   ["defpactTwin.ts", defpactTwin],
   ["multistepSpec.ts", multistepSpec],
+  ["fedslice.ts", fedslice],
 ];
 
 const read = (f: string) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");

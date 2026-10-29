@@ -1,5 +1,79 @@
 # Changelog
 
+## 0.3.0 — 2026-10-29
+
+**`groupBy` reaches the type, and `sliceFedArgs` applies the whole judgement.**
+
+A judgement the registry carried correctly was invisible to every consumer that read it through
+this package. That is the defect; the splitter is the fix.
+
+### The field that was published and untyped
+
+`PartitionMeta` declared `kind`, `shape`, `axis`, `lockstep`, `inner`, `rounds`, `via`,
+`progress`, `steps` and `reason`. It did not declare **`groupBy`** — a boundary a cut may not fall
+inside — which `Deploy/OURONET-REGISTRY.json` carries on three entrypoints:
+
+```
+AQP-POOL|CCp_BatchVacate{TrueFungible,OrtoFungible,Collectables}   groupBy: "beneficiary-ids"
+```
+
+It is authored deliberately, validated by the Pact repo's `_registry.py --check` (is it a
+parameter, is it a list, is it the axis or one of its lockstep members), and published into the
+artefact. So `partitionOf(key)` returned it at RUNTIME while the interface said it did not exist,
+and a splitter written from this type would honour `axis` and `lockstep`, cut wherever it liked,
+and be wrong in exactly the place the field exists to protect.
+
+**OuronetUI's own changelog said as much when the field shipped** — *"`groupBy` constrains WHERE a
+cut may fall, which neither `axis` nor `lockstep` could express — and without it the splitter
+would cut exactly where the vacate is unsound."* The knowledge was recorded in one repo, enforced
+in another, and absent from the type between them.
+
+### Why it matters for the vacate family specifically
+
+`XI_1|Vacate*UnwindFromLegs` calls the per-beneficiary unwind once per unique beneficiary **in
+that slice, UNGATED**, fed that slice's partial sum. Two of its six legs are genuinely
+delta-based and add up correctly; the other four are a settle triple that would fire **once per
+SLICE instead of once per BENEFICIARY**.
+
+The sibling DRAIN family gates that same triple behind `UR_AQP|UserUnn == 0`, so it fires once
+however the legs are cut. **That asymmetry is the evidence for both halves**, which is why the
+drain blocks carry no `groupBy` and are safe to cut anywhere — and why a test here asserts their
+*absence* as well as the vacate family's presence.
+
+### `sliceFedArgs(meta, args, requested)`
+
+Cuts one argument map into at most `requested` slices, honouring `axis`, `lockstep` **and**
+`groupBy` together. Each failed alone is a different silent defect:
+
+| ignored | what happens | detectable downstream? |
+|---|---|---|
+| `axis` | a wrong parameter is cut; the whole list is sent N times | no |
+| `lockstep` | two equal-length arrays, misaligned — wrong amount to wrong nonce | no |
+| `groupBy` | the cut falls mid-group; an ungated per-group write runs per SLICE | no |
+
+So the judgement is not re-derived per consumer. Non-positional arguments (`patron`, `pool-id`,
+the asset id) are copied into every slice unchanged.
+
+**Grouped by VALUE, not by adjacency.** A preflight is free to interleave two beneficiaries' legs;
+grouping contiguous runs would then split one across slices *while appearing to have grouped*. The
+test fixture is deliberately `b1,b2,b1,b2`, and the adjacency mutant dies on it.
+
+**Refusal is a result, not an exception.** The registry's default is *absence means DO NOT SPLIT*,
+so every reason returns a sentence: unclassified, cursor (naming the pager and its sequencing),
+architectural (naming the twin), reduction (parallel within a round, sequential between),
+axis-less, axis-not-a-list, empty axis, and a lockstep length mismatch reported with both counts.
+A caller handed one slice back from an unclassified operation has been told it may fan out when it
+may not.
+
+### Tests
+
+`tests/fedslice.test.ts`, 22 cases. Four mutants, all dead: `groupBy` ignored (3 failures),
+grouping by adjacency (3), lockstep not permuted with the axis (4), lockstep length check dropped
+(1). Three of the cases read the REAL bundled registry rather than fixtures — presence on all
+three vacate blocks, absence on all three drain blocks, and one real block cut end to end —
+because the gap being closed was a type that had drifted from the data, and fixtures cannot see
+that.
+
 ## 0.2.0 — 2026-10-29
 
 **The multi-transaction vocabulary, lifted — and a correction to one of these modules made within

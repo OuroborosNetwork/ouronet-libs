@@ -30,6 +30,31 @@ export interface PartitionMeta {
   shape?: "partition" | "reduction";
   axis?: string;
   lockstep?: string[];
+  /**
+   * A BOUNDARY A CUT MAY NOT FALL INSIDE — every entry sharing a value here must land in the
+   * SAME slice.
+   *
+   * MISSING FROM THIS TYPE UNTIL 2026-10-29, while the registry carried it correctly on three
+   * entrypoints. That gap is the whole reason this field needs a doc comment: the judgement was
+   * written down, validated by `_registry.py --check` (is it a parameter, is it a list, is it the
+   * axis or one of its lockstep members), published into the artefact — and INVISIBLE to every
+   * TypeScript consumer reading it through `partitionOf`. A splitter written from this interface
+   * would honour `axis` and `lockstep`, cut wherever it liked, and be wrong in exactly the place
+   * `groupBy` exists to protect. OuronetUI's own changelog said so when the field shipped:
+   * *"without it the splitter would cut exactly where the vacate is unsound."*
+   *
+   * THE THREE THAT CARRY IT are `AQP-POOL|CCp_BatchVacate{TrueFungible,OrtoFungible,Collectables}`,
+   * with `groupBy: "beneficiary-ids"`. Their per-beneficiary unwind is UNGATED and is fed that
+   * SLICE's partial sum: two of its six legs are genuinely delta-based and add up, the other four
+   * are a settle triple that would fire once per SLICE instead of once per BENEFICIARY. The
+   * sibling DRAIN family gates that same triple behind `UR_AQP|UserUnn == 0` so it fires once,
+   * which is why those three carry no `groupBy` and are safe to cut anywhere — the asymmetry
+   * between the two families IS the evidence.
+   *
+   * Use `sliceFedArgs`, which applies this. Reading `axis`/`lockstep` and cutting by hand is the
+   * mistake this field cannot prevent on its own.
+   */
+  groupBy?: string;
   inner?: { axis: string; lockstep?: string[]; note: string };
   rounds?: string;
   /** `cursor` / `architectural` — the entrypoint that carries the split */
