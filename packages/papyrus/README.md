@@ -9,7 +9,9 @@ hover hint → Papyrus (price · simulate · lock in · split) → sign → subm
 
 ## Status
 
-`0.2.0` on public npmjs — the multi-transaction vocabulary joins the batch planner.
+`0.3.0` on public npmjs — `groupBy` reaches the type, and `sliceFedArgs` applies the whole
+judgement. Built against `@ouronet/talos-registry@2.12.0` (441 entrypoints, 34 carrying a
+partition: 20 `list/partition`, 4 `list/reduction`, 8 `architectural`, 2 `cursor`).
 
 **v0.2.0** lifts the five modules the Papyrus migration produced, by the same rule v0.1.0 used —
 only what has **zero host couplings, measured**:

@@ -4,6 +4,25 @@
 
 **`groupBy` reaches the type, and `sliceFedArgs` applies the whole judgement.**
 
+> **Published 2026-10-31 against `@ouronet/talos-registry@2.12.0`, and the registry moved under
+> the tests between authoring and release.** V18 took `AQP-POOL|CCp_BatchDrain*` to the admin
+> band, which the registry does not index, and added `AQP-EVCT|CCp_EvictMultiRewards`. So the
+> population is now **441 entrypoints, 34 partitioned** (was 442/36) and the verdict tally is
+> **20 parallel / 6 sequential-free / 8 sequential-constrained** (was 22/6/8) — three losses and
+> one gain, re-read against the new data rather than adjusted to fit.
+>
+> The DRAIN family named below is therefore **no longer on this surface**, and the test that
+> asserted its ungrouped-ness was failing on its FIRST line (`carries no partition block`)
+> rather than on its claim — a test that cannot reach its own assertion. The contrast now runs
+> against `CCp_EvictMultiRewards`, which is live and the same shape, and it gained the two
+> assertions it was missing: `groupBy: undefined` is ALSO what an entrypoint with no partition
+> block reports, so `kind` and `axis` are pinned too. That is what separates *"cut anywhere"*
+> from *"do not cut at all"*.
+>
+> The reasoning in the section *"Why it matters for the vacate family specifically"* is
+> unchanged and still true of the admin wrappers — the Talos doc calls them byte-for-byte their
+> `CCp_` predecessors with a gasless patron in slot 0.
+
 A judgement the registry carried correctly was invisible to every consumer that read it through
 this package. That is the defect; the splitter is the fix.
 

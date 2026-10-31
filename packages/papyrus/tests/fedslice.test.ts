@@ -210,17 +210,25 @@ describe("refusals are results, with a sentence", () => {
  * judgement with the one safety constraint missing. Fixtures alone would not have noticed, and
  * will not notice if it happens again.
  */
-describe("the bundled registry's own vacate and drain judgements", () => {
+describe("the bundled registry's own vacate and eviction judgements", () => {
   const VACATE = [
     "TS02-C3.AQP-POOL|CCp_BatchVacateTrueFungible",
     "TS02-C3.AQP-POOL|CCp_BatchVacateOrtoFungible",
     "TS02-C3.AQP-POOL|CCp_BatchVacateCollectables",
   ];
-  const DRAIN = [
-    "TS02-C3.AQP-POOL|CCp_BatchDrainTrueFungible",
-    "TS02-C3.AQP-POOL|CCp_BatchDrainOrtoFungible",
-    "TS02-C3.AQP-POOL|CCp_BatchDrainCollectable",
-  ];
+  /**
+   * THE UNGROUPED HALF CHANGED HANDS, and it had to. This was the drain trio
+   * (`AQP-POOL|CCp_BatchDrain*`) until V18 moved that family to the ADMIN band, which this
+   * registry does not index -- so `partitionOf` now returns undefined for those keys and the
+   * assertion below would have failed on its FIRST line (`carries no partition block`) rather
+   * than on its claim. A test that cannot reach its own assertion proves nothing.
+   *
+   * `AQP-EVCT|CCp_EvictMultiRewards` is the better partner anyway: it is live, it is the same
+   * shape (parallel leg arrays each tagged with a beneficiary), and its authored reason states
+   * the asymmetry as a DECISION. The contrast is therefore still exact -- see the note below,
+   * which is rewritten for it.
+   */
+  const UNGROUPED = ["TS02-C3.AQP-EVCT|CCp_EvictMultiRewards"];
 
   it("reads groupBy off all three vacate blocks, THROUGH the type", () => {
     for (const key of VACATE) {
@@ -233,15 +241,22 @@ describe("the bundled registry's own vacate and drain judgements", () => {
   });
 
   /**
-   * AND THE DRAIN FAMILY MUST NOT CARRY IT. The asymmetry is the evidence for both halves: drain
-   * gates its settle triple behind `UR_AQP|UserUnn == 0` so it fires once however the legs are
-   * cut, and vacate does not. A `groupBy` appearing here would mean someone had made the two
-   * families look alike, and the cut that is sound for one is unsound for the other.
+   * AND THE EVICTION SLICE MUST NOT CARRY IT. The asymmetry is the evidence for both halves: a
+   * vacate settles per beneficiary on the RESULTING `UR_AQP|UserUnn`, so cutting one
+   * beneficiary's legs across two transactions settles early; an eviction settles nothing,
+   * touches no scores and runs each leg through the same collect phases against its own lane.
+   * A `groupBy` appearing here would mean someone had made the two look alike, and the cut that
+   * is sound for one is unsound for the other.
    */
-  it("leaves the drain family ungrouped, which is what makes it cuttable anywhere", () => {
-    for (const key of DRAIN) {
+  it("leaves the eviction slice ungrouped, which is what makes it cuttable anywhere", () => {
+    for (const key of UNGROUPED) {
       const meta = partitionOf(key);
       expect(meta, `${key} carries no partition block`).toBeTruthy();
+      // BOTH HALVES, because `groupBy: undefined` is also what an entrypoint with NO partition
+      // block reports -- so the line above is load-bearing, and the kind/axis pin below is what
+      // separates "cut anywhere" from "do not cut at all".
+      expect(meta!.kind, `${key} is no longer a list route`).toBe("list");
+      expect(meta!.axis, `${key} cuts on its beneficiary array`).toBe("beneficiaries");
       expect(meta!.groupBy, `${key} gained a groupBy — the two families are not the same case`)
         .toBeUndefined();
     }

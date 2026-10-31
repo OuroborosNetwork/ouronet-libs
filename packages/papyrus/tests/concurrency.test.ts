@@ -24,10 +24,15 @@ const withPartition = Object.entries(ENTRYPOINTS)
 
 describe("the registry's partitions, classified", () => {
   it("the population is what was measured — so a release that changes it is visible", () => {
-    // 2.9.0: 442 entrypoints, 36 carrying a partition. If these move, the mapping below has to
-    // be re-read against the new data rather than assumed to still hold.
-    expect(Object.keys(ENTRYPOINTS).length).toBe(442);
-    expect(withPartition.length).toBe(36);
+    // 2.12.0: 441 entrypoints, 34 carrying a partition. If these move, the mapping below has to
+    // be re-read against the new data rather than assumed to still hold -- and it did move, so
+    // it WAS re-read: measured 20 list/partition, 4 list/reduction, 8 architectural, 2 cursor.
+    //
+    // WAS 442/36 AT 2.9.0, and the delta is three losses and one gain rather than drift. V18
+    // moved `AQP-POOL|CCp_BatchDrain*` to the admin band, which the registry does not index,
+    // and `AQP-EVCT|CCp_EvictMultiRewards` arrived with a partition block of its own.
+    expect(Object.keys(ENTRYPOINTS).length).toBe(441);
+    expect(withPartition.length).toBe(34);
   });
 
   it("classifies every partitioned entrypoint, with no fall-through to the default", () => {
@@ -55,9 +60,9 @@ describe("the registry's partitions, classified", () => {
       const v = concurrencyOf(partitionOf(key));
       tally.set(v.kind, (tally.get(v.kind) ?? 0) + 1);
     }
-    // 22 list/partition → parallel; 4 reduction + 2 cursor → sequential-free; 8 defpacts.
+    // 20 list/partition → parallel; 4 reduction + 2 cursor → sequential-free; 8 defpacts.
     expect(Object.fromEntries(tally)).toEqual({
-      "parallel": 22,
+      "parallel": 20,
       "sequential-free": 6,
       "sequential-constrained": 8,
     });
