@@ -13,6 +13,19 @@ hover hint → Papyrus (price · simulate · lock in · split) → sign → subm
 judgement. Built against `@ouronet/talos-registry@2.12.0` (441 entrypoints, 34 carrying a
 partition: 20 `list/partition`, 4 `list/reduction`, 8 `architectural`, 2 `cursor`).
 
+**v0.3.0** closes a gap between what the registry PUBLISHES and what this package's type
+DECLARES. `PartitionMeta` did not declare `groupBy` — a boundary a cut may not fall inside —
+while `partitionOf()` returned it at runtime, so a splitter written from this type would honour
+`axis` and `lockstep`, cut wherever it liked, and be wrong in exactly the place the field exists
+to protect. `sliceFedArgs` now applies the whole judgement rather than part of it.
+
+Released against `@ouronet/talos-registry@2.12.0`, whose surface moved under these tests between
+authoring and release: V18 took the three `AQP-POOL|CCp_BatchDrain*` slices to the admin band
+(not indexed by the registry) and added `AQP-EVCT|CCp_EvictMultiRewards`. The figures above were
+re-read against the new data, and the ungrouped half of the vacate-vs-drain contrast test now
+runs against the eviction slice — the drain keys no longer resolve, so that test was failing
+before it reached its own claim. See the CHANGELOG.
+
 **v0.2.0** lifts the five modules the Papyrus migration produced, by the same rule v0.1.0 used —
 only what has **zero host couplings, measured**:
 
