@@ -55,7 +55,7 @@ teaches a call shape that will not work.
 
 ## Rule 2 — the arguments belong to the execution, the cost belongs to the preview
 
-**426 of the 442 entrypoints have a preview whose parameter list differs from their own.** Only 16
+**425 of the 441 entrypoints have a preview whose parameter list differs from their own.** Only 16
 match. Different names, different order, different arity.
 
 So the two cannot share one numbered list, and the preview's values cannot be labelled with the

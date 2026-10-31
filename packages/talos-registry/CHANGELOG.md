@@ -1,3 +1,96 @@
+## 2.12.0 — 2026-10-31
+
+**The V18 surface, regenerated from the chain — and the first release in which 2.11.0's
+figures were wrong.**
+
+`surfaceHash` **`2e2bfa3eb1273dc7` → `93ee42f6a409655d`**, 442 → **441** entrypoints,
+447 → **453** previews. Confirmed against mainnet the same hour: 12 module hashes, 12
+current, 0 drifted.
+
+### 2.11.0 was never published, and that is why this is 2.12.0
+
+Its notes state *"the generated registry is untouched; `surfaceHash` unchanged"* — a true
+sentence when written and a false one as soon as the artefact was regenerated. Rather than
+amend a released claim, it is superseded: npm goes 2.10.0 → 2.12.0 and 2.11.0's
+`pactDecimal` / `pactInteger` work ships inside this release. Nothing is lost; a version
+number is cheaper than a changelog that lies about its own contents.
+
+### What moved on chain
+
+| | |
+|---|---|
+| **+3** | `AQP-EVCT|CC_FullEvictRewards`, `CC_EvictSingleReward`, `CCp_EvictMultiRewards` — reward eviction, V17 |
+| **−4** | `AQP-POOL|CCp_BatchDrain{TrueFungible,OrtoFungible,Collectable}` and `C_FinalizeVacate` — V18 moved them to the ADMIN band |
+| **~1** | `INFO_AQP-FVT|Collect` gained `collector`, so Master Collect's preview is six arguments, not five |
+
+The drain trio did not disappear; it became `AQP-POOL|AAp_BatchDrain*`. This registry
+indexes the CLIENT bands only — measured on this build: 411 `C_`, 39 `CC_`, 11 `CCp_`,
+4 `Cp_`, and not one `A`. **An admin entrypoint leaving this surface is not a regression,
+and a consumer that still calls the old name gets `no such member` from the chain.**
+Ownership did not weaken either: the admin wrappers keep `CAP_VctVacatePoolOwner`, which
+requires the transaction SENDER to own the pool, under `P|ADMINISTRATIVE-SUMMONER`.
+
+### `CCp_EvictMultiRewards` ships a partition block, and it declares NO group boundary
+
+Its sibling `CCp_BatchVacate*` has one on `beneficiary-ids`, so the absence here is the
+interesting half:
+
+```ts
+planCall("TS02-C3.AQP-EVCT|CCp_EvictMultiRewards").groupBy   // null
+planCall("TS02-C3.AQP-POOL|CCp_BatchVacateTrueFungible").groupBy  // "beneficiary-ids"
+```
+
+A vacate settles per beneficiary on the **resulting** `UR_AQP|UserUnn`, so cutting one
+beneficiary's legs across two transactions settles early. An eviction touches no scores,
+freezes nothing, and runs each leg through the same `XI_CollectDrip` / `XI_CollectPay`
+phases a self-collect runs against that one lane — so one beneficiary's legs may land in
+different transactions. `axis` is `beneficiaries`, in lockstep with `score-entity-types`,
+`score-entity-ids` and `reward-dptf-ids`.
+
+**It is safe to cut anywhere and unsafe to cut stale.** The claimable refusal is a fold over
+the WHOLE slice against `RPS.URC_LiveClaimable`, so one leg collected between the read and
+the send aborts the entire slice — deliberately, per the module: *"a stale slice refuses
+rather than skips"*. Smaller slices lose less to that race; a caller who cannot tolerate it
+should drive `CC_EvictSingleReward` one leg at a time, where a bounce costs one transaction.
+
+### A preflight table was found pointing at nothing
+
+`CCp_EvictMultiRewards` was shipping `preflightUnresolved`, which the generator's own gate
+refuses — correctly: a parallel recipe whose slices a caller cannot build is an entrypoint
+nobody can act on. It now names `AQP-EVCT.URHC_BuildEvictPlans` and
+`URHC_BuildEvictSlicePlan`.
+
+Fixing it surfaced three ORPHANS beside it: `LEG_PREFLIGHT` rows still keyed on
+`AQP-POOL|CCp_BatchDrain*`. **The probe's `preflight: clean` line could not see them** — it
+verifies that every reader a row CITES exists in deployed code, and those readers
+(`AQP-VCT.URH_Vacate*PoolLegs`) all still exist. Checking the value and never the key is how
+an orphan survives a green run. `_registry.py --check` now reports a row whose key no
+entrypoint carries, and it was negative-tested rather than assumed.
+
+The authored partition blocks for those three moved to a `partitionRetired` section —
+their reading of the exec is still true of the admin wrappers and took real work, but a
+block under `partition` is PERMISSION TO CUT A CALL bound to a name, and the next function
+to take that name would inherit it.
+
+### Figures re-read, not carried forward
+
+`README.md` and `TOOLTIP-CANON.md` both quoted the old build; every number in them is
+asserted against the bundled snapshot, so all nine stale ones failed the suite rather than
+misleading a reader — which is the mechanism working. `direct` 410 → 411,
+`indirect-parallel` 14 → 12, ghost slots 2,269 → 2,263 across 287 distinct names, and
+previews-that-diverge-from-their-entrypoint 426 → 425 of 441.
+
+### Known: the account ghost is the SMART variant
+
+All 49 account-shaped entries in the ghost dictionary carry one value, and its glyph body is
+byte-identical to `GOV|DHV1|SC_NAME` with the first character swapped — the contract defines
+the pair as `(defun GOV|DHV2|SC_NAME () (+ "Σ" (drop 1 (GOV|DHV1|SC_NAME))))`. `Ѻ.` is
+STANDARD and `Σ.` is SMART, enforced by `DALOS|C>DEPLOY-STANDARD-OURONET-ACCOUNT`. So the
+ghost shipped here is a smart account where a standard one is wanted, and OuronetUI corrects
+the variant locally against its own constants rather than wait on a republish. Unchanged in
+this release because the correction belongs in the Pact repo's
+`OURONET-REGISTRY.ghosts.json` and would move `surfaceHash` again.
+
 ## 2.11.0 — 2026-10-29
 
 **A decimal field inside an object can now be rendered: `pactDecimal` / `pactInteger`.**

@@ -189,7 +189,20 @@ describe("the nonce-bearing bulk transfers cut on both levels too", () => {
 
 describe("a GROUP BOUNDARY is never cut through", () => {
   const VAC = "TS02-C3.AQP-POOL|CCp_BatchVacateTrueFungible";
-  const DRN = "TS02-C3.AQP-POOL|CCp_BatchDrainTrueFungible";
+  /**
+   * THE CONTRAST PARTNER CHANGED, and it had to: `CCp_BatchDrainTrueFungible` was this test's
+   * no-boundary half until V18 renamed the drain trio to `AQP-POOL|AAp_BatchDrain*`. This
+   * registry indexes the CLIENT bands only, so `getEntrypoint` on the old key now THROWS and
+   * both assertions died at resolution rather than on their claim.
+   *
+   * `AQP-EVCT|CCp_EvictMultiRewards` is the better partner anyway: it is live, it is the same
+   * shape (parallel leg arrays each tagged with a beneficiary), and its authored block states
+   * the asymmetry as a decision rather than as an omission — a vacate settles per beneficiary
+   * on the RESULTING `UR_AQP|UserUnn`, so splitting one beneficiary's legs settles early;
+   * eviction touches no scores and each leg runs a self-collect's own phases against its own
+   * lane, so one beneficiary's legs may land in different transactions.
+   */
+  const EVC = "TS02-C3.AQP-EVCT|CCp_EvictMultiRewards";
 
   /** `owners` legs, each tagged with a beneficiary. */
   const legs = (benefs: string[]) => ({
@@ -200,10 +213,16 @@ describe("a GROUP BOUNDARY is never cut through", () => {
   });
   const benefsOf = (c: Record<string, unknown>) => c["beneficiary-ids"] as string[];
 
-  it("declares the boundary on the vacate trio and NOT on the drain trio", () => {
+  it("declares the boundary on the vacate trio and NOT on the eviction slice", () => {
     expect(splitPlan(VAC).groupBy).toBe("beneficiary-ids");
-    expect(splitPlan(DRN).groupBy).toBeNull();
+    expect(splitPlan(EVC).groupBy).toBeNull();
     expect(splitPlan(VAC).warnings.join(" ")).toMatch(/GROUP BOUNDARY on 'beneficiary-ids'/);
+    // BOTH ARE CLASSIFIED. `groupBy: null` means "cut anywhere"; an UNCLASSIFIED entrypoint
+    // also reports null and means "do not cut at all". Without this line the assertion above
+    // would pass just as well on an entrypoint that lost its partition block entirely.
+    expect(splitPlan(EVC).kind).toBe("list");
+    expect(splitPlan(EVC).axis).toBe("beneficiaries");
+    expect(splitPlan(EVC).warnings.join(" ")).not.toMatch(/GROUP BOUNDARY/);
   });
 
   it("keeps every beneficiary's legs in ONE transaction", () => {
@@ -257,13 +276,22 @@ describe("a GROUP BOUNDARY is never cut through", () => {
     expect(benefsOf(bCall)).not.toContain("A");                    // and alone
   });
 
-  it("the DRAIN trio has no boundary and cuts freely — the asymmetry is real", () => {
-    // Same data, no groupBy: a beneficiary MAY span transactions, because settle is gated on
-    // UR_AQP|UserUnn == 0 and so fires exactly once whichever batch lands last.
-    const v = legs(["A", "A", "A", "A"]);
-    const calls = splitCallByCapacity(DRN, v, 2);
+  it("the EVICTION slice has no boundary and cuts freely — the asymmetry is real", () => {
+    // Same data, no groupBy: one beneficiary's legs MAY span transactions, because eviction
+    // settles nothing per beneficiary — each leg is an independent collect on its own lane.
+    const v = {
+      patron: "P", executor: "E", "fvt-id": "FVT",
+      beneficiaries: ["A", "A", "A", "A"],
+      "score-entity-types": [1, 1, 1, 1],
+      "score-entity-ids": ["s0", "s1", "s2", "s3"],
+      "reward-dptf-ids": ["R", "R", "R", "R"],
+    };
+    const calls = splitCallByCapacity(EVC, v, 2);
     expect(calls).toHaveLength(2);
-    expect(calls.every(c => benefsOf(c).every(b => b === "A"))).toBe(true);
+    expect(calls.every(c => (c.beneficiaries as string[]).every(b => b === "A"))).toBe(true);
+    // the lockstep arrays travel with their own leg, so nothing is lost or re-paired
+    expect(calls.flatMap(c => c["score-entity-ids"] as string[]))
+      .toEqual(["s0", "s1", "s2", "s3"]);
   });
 
   it("refuses a groupBy array of the wrong length rather than mispairing", () => {

@@ -30,11 +30,16 @@ describe("absence means do not split", () => {
   });
 
   it("the vast majority of the surface is unclassified, which is the safe default", () => {
-    // 26 list routes as of 2.7.0 (the six AQP drain/vacate slices joined). `splittable` counts
-    // LIST routes only -- the 8 architectural and 2 cursor routes are real splits a client does
-    // not perform by cutting, so they are deliberately not in this number.
+    // 24 list routes as of 2.12.0. `splittable` counts LIST routes only -- the architectural
+    // and cursor routes are real splits a client does not perform by cutting, so they are
+    // deliberately not in this number.
+    //
+    // WAS 26, and the move is two LOSSES and one GAIN rather than drift. V18 renamed the three
+    // AQP drain slices to `AQP-POOL|AAp_BatchDrain*` -- the admin band, which this registry
+    // does not index -- so they left the surface and their authored blocks moved to
+    // `partitionRetired`. `AQP-EVCT|CCp_EvictMultiRewards` arrived with the same release.
     const classified = entrypointKeys().filter(k => splitPlan(k).splittable);
-    expect(classified.length).toBe(26);
+    expect(classified.length).toBe(24);
     expect(classified.length).toBeLessThan(entrypointKeys().length / 10);
   });
 });
