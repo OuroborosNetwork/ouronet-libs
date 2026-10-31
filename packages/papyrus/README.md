@@ -9,9 +9,14 @@ hover hint → Papyrus (price · simulate · lock in · split) → sign → subm
 
 ## Status
 
-`0.3.0` on public npmjs — `groupBy` reaches the type, and `sliceFedArgs` applies the whole
+`0.4.0` on public npmjs — `groupBy` reaches the type, and `sliceFedArgs` applies the whole
 judgement. Built against `@ouronet/talos-registry@2.12.0` (441 entrypoints, 34 carrying a
 partition: 20 `list/partition`, 4 `list/reduction`, 8 `architectural`, 2 `cursor`).
+
+**v0.4.0** adds `threads` to `PapyrusKind` — the catalogue of controls a Papyrus is woven from
+becomes a member of the family vocabulary rather than a string in a settings page. Not a form:
+PAGE, ROLL and LEAF are sheets, threads is what they are made of. A consumer pinned below 0.4.0
+has no `threads` row in `PAPYRUS_COPY`, so guard the lookup rather than destructuring it.
 
 **v0.3.0** closes a gap between what the registry PUBLISHES and what this package's type
 DECLARES. `PartitionMeta` did not declare `groupBy` — a boundary a cut may not fall inside —

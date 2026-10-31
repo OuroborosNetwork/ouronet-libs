@@ -1,3 +1,45 @@
+## 0.4.0 — 2026-10-31
+
+**`threads` joins the family vocabulary — the controls a Papyrus is woven from get a name the
+engine can see.**
+
+Owner: *"we still have those at Prototypes, CFM Input Patterns, thats how they called ... Thats
+what has to be used everywhere, and they need renaming since we changed to papyrus
+architecture. We may name them Papyrus Threads."*
+
+### Why a member and not a label
+
+"CFM Input Patterns" survived a whole architecture rename because its name lived in exactly one
+place — a string in a settings page — where nothing could see it. `PapyrusKind` is the one
+vocabulary shared by the shelf and the running screens, so a catalogue named outside it is a
+catalogue that drifts by default.
+
+```ts
+export type PapyrusKind = "page" | "roll" | "leaf" | "threads";
+```
+
+`threads` is NOT a form. PAGE, ROLL and LEAF are sheets; threads is what they are made of —
+resident spend, payment-key spend, string, guard, bool, integer, integer list, each with a free
+and an autonomous variant. Nothing that renders an instrument should ever receive it.
+
+### The claim the name makes
+
+A thread is **the control the engine actually mounts**, not a sample of what an input could look
+like. When a Papyrus renders a bare `<input>` instead, that is a thread missing from the weave —
+and it is found one screen at a time: Wrap STOA's payment-key balance, Unstake UrStoa's ceiling,
+Cold Recovery's `ra`. Every one was a module that already existed and was not reached for.
+
+### A consumer note that matters for one release
+
+A consumer pinned to 0.3.0 or earlier has no `threads` row in `PAPYRUS_COPY` while its
+TypeScript may already allow the member. `PAPYRUS_COPY[kind]` destructured on a missing row
+throws, and a badge is mounted at the top of every instrument — so it would blank the screen it
+labels. OuronetUI's `PapyrusBadge` now falls back to the member's own name and says the
+dependency is stale. Worth copying in any other consumer.
+
+Tests: the copy table and the union are asserted to cover each other, so a member added without
+copy fails here rather than rendering `undefined` downstream. 125 passing.
+
 # Changelog
 
 ## 0.3.0 — 2026-10-29

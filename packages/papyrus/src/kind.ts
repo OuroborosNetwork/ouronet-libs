@@ -67,9 +67,25 @@
  * from the app that hosts it — once Codex consumes Papyrus too, two apps will show the same
  * Papyrus version and different app versions, and that is the fact a user needs.
  */
-export const PAPYRUS_VERSION = "0.3.0";
+export const PAPYRUS_VERSION = "0.4.0";
 
-export type PapyrusKind = "page" | "roll" | "leaf";
+/**
+ * `threads` IS NOT A FORM, IT IS WHAT THE FORMS ARE WOVEN FROM — added 2026-10-31.
+ *
+ * Owner: *"we still have those at Prototypes, CFM Input Patterns, thats how they called ...
+ * Thats what has to be used everywhere, and they need renaming since we changed to papyrus
+ * architecture. We may name them Papyrus Threads."*
+ *
+ * It joins this union rather than living beside it because the whole point of the vocabulary is
+ * that one word names the thing on the shelf AND the thing on the screen. A catalogue of
+ * controls called something else in the package than in the gallery is how "CFM Input Patterns"
+ * survived the rename to Papyrus in the first place — the name was never anywhere the engine
+ * could see it.
+ *
+ * A consumer switching on `PapyrusKind` to render a badge will now meet `threads`; it is a
+ * label, not a sheet, so nothing that renders an instrument should ever receive it.
+ */
+export type PapyrusKind = "page" | "roll" | "leaf" | "threads";
 
 export const PAPYRUS_COPY: Readonly<Record<PapyrusKind, { label: string; blurb: string }>> = {
   page: {
@@ -92,5 +108,13 @@ export const PAPYRUS_COPY: Readonly<Record<PapyrusKind, { label: string; blurb: 
       + "it happens, discovering the transaction rather than asking you to type it — out of "
       + "inputs you captured before it opened. Only once the route exists can it be priced, so a "
       + "Leaf with no cost yet is still working, not broken.",
+  },
+  threads: {
+    label: "Papyrus Threads",
+    blurb:
+      "The controls every Papyrus is woven from — resident spend, payment-key spend, string, "
+      + "guard, bool, integer, integer list — each with its free and its autonomous variant. "
+      + "Not a form: a thread is the control the engine actually mounts, so a Papyrus rendering "
+      + "a bare input is a thread missing from the weave.",
   },
 };
