@@ -36,11 +36,11 @@ describe("an ungrouped fed slice", () => {
   it("cuts the axis and every lockstep parameter together", () => {
     const r = ok(sliceFedArgs(LIST, ARGS, 2));
     expect(r.slices).toHaveLength(2);
-    expect(r.slices[0].args["owner-ids"]).toEqual(["o1", "o2"]);
-    expect(r.slices[0].args["beneficiary-ids"]).toEqual(["b1", "b2"]);
-    expect(r.slices[0].args.amounts).toEqual([1, 2]);
-    expect(r.slices[1].args["owner-ids"]).toEqual(["o3", "o4"]);
-    expect(r.slices[1].args.amounts).toEqual([3, 4]);
+    expect(r.slices[0]!.args["owner-ids"]).toEqual(["o1", "o2"]);
+    expect(r.slices[0]!.args["beneficiary-ids"]).toEqual(["b1", "b2"]);
+    expect(r.slices[0]!.args.amounts).toEqual([1, 2]);
+    expect(r.slices[1]!.args["owner-ids"]).toEqual(["o3", "o4"]);
+    expect(r.slices[1]!.args.amounts).toEqual([3, 4]);
   });
 
   /** Everything that is not the axis or a lockstep member rides along unchanged. */
@@ -264,7 +264,7 @@ describe("the bundled registry's own vacate and eviction judgements", () => {
 
   /** End to end: a real block, real arguments, grouped where the registry says to group. */
   it("cuts a real vacate block on its declared boundary", () => {
-    const meta = partitionOf(VACATE[0]);
+    const meta = partitionOf(VACATE[0]!);
     const r = sliceFedArgs(meta, {
       patron: "P", "pool-id": "POOL", "dptf-id": "OURO",
       "owner-ids": ["o1", "o2", "o3", "o4"],
