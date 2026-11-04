@@ -4,6 +4,33 @@ All notable changes to `@ouronet/ouronet-core`.
 
 This package is the historical continuation of `@ouronet/ouronet-core` v0.x–v3.3.8. v4.0.0 split it into a two-package npm workspace under `StoaChain/stoa-js` — chain-generic infrastructure moved out into [`@stoachain/stoa-core`](https://www.npmjs.com/package/@stoachain/stoa-core), this package retained the Ouronet-specific business logic. The `4.0.0` heading below is the first release after the split.
 
+## 5.3.3 — 2026-11-04
+
+**`buildCTransferAcross` formats its own amount instead of trusting a comment that the caller
+already did.**
+
+The second, independent reproduction of the Sublimate-overspend anti-pattern, found by a
+blast-radius scan rather than by a report. `buildCTransferAcross` carried a doc comment saying
+the caller had already run the amount through `formatDecimalForPact`, and acted on it. Its
+sibling `buildCrossChainTransfer` had the identical comment and had already been fixed for
+finding F-BUG-003 — this one was simply missed at the time.
+
+A comment is not a guarantee. Both callers in `OuronetUI` (`CrossChainTransfer.tsx` and
+`MinerTransfer.tsx`) were in fact doing the opposite of what it claimed: they pre-rounded with
+`parseFloat(...).toFixed(12)`, which destroys precision on any token declaring more than twelve
+decimals. OURO declares twenty-four. The failure mode is the one the Sublimate defect produced
+live — a full-precision balance rounded UP past what the account holds, and a chain refusal or
+an overspend depending on which way the last digit fell.
+
+The function now calls `formatDecimalForPact(amount)` itself, which is lossless for a string and
+is the same treatment its sibling already applies. The `parseFloat().toFixed(12)` pre-rounding
+was removed from both call sites, so the raw string now travels end to end.
+
+**Near side, far side.** The near side of this family of defects is always a UI coercing a
+chain-sourced decimal string through a JS `number`; the far side is a builder that cannot
+recover the digits once they are gone. This release closes the far side for cross-chain
+transfers, as `@ouronet/talos-registry@2.12.1` does for the Papyrus decimal fields.
+
 ## 5.3.2 — 2026-10-16
 
 ### Every true-fungible transfer was sending its arguments in the wrong order

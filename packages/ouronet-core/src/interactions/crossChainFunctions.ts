@@ -155,7 +155,9 @@ export interface CTransferAcrossParams {
   sender: string;
   receiver: string;
   receiverGuard: { keys: string[]; pred: string };
-  amount: string; // already formatted (e.g. "1.000000000000")
+  amount: string; // a raw (or already-formatted) decimal string -- `buildCTransferAcross`
+                  // formats it itself via `formatDecimalForPact`, so the caller need not
+                  // pre-round. Pass the user/MAX-filled string straight through.
   sourceChain: string;
   targetChain: string;
   senderPublicKey: string;
@@ -181,8 +183,16 @@ export function buildCTransferAcross(params: CTransferAcrossParams) {
     gasStationPublicKey,
   } = params;
 
+  // Mirrors `buildCrossChainTransfer`'s F-BUG-003 fix above. The `CTransferAcrossParams.amount`
+  // doc comment used to say "already formatted" -- a contract this function never enforced, and
+  // both UI call sites (`CrossChainTransfer.tsx`, `MinerTransfer.tsx`) independently re-added the
+  // exact lossy `parseFloat(...).toFixed(12)` pre-formatting that comment waved away. Format
+  // here, once, regardless of what the caller passed, so the lossless path does not depend on
+  // every caller remembering not to round first.
+  const formattedAmount = formatDecimalForPact(amount);
+
   const keysetName = `receiver-guard-${Date.now()}`;
-  const pactCode = `(coin.C_TransferAcross "${sender}" "${receiver}" (read-keyset "${keysetName}") "${targetChain}" ${amount})`;
+  const pactCode = `(coin.C_TransferAcross "${sender}" "${receiver}" (read-keyset "${keysetName}") "${targetChain}" ${formattedAmount})`;
 
   if (sourceChain === "0") {
     // Chain 0: Gas Station pays via DALOS.GAS_PAYER
@@ -196,7 +206,7 @@ export function buildCTransferAcross(params: CTransferAcrossParams) {
         w(`${KADENA_NAMESPACE}.DALOS.GAS_PAYER`, "", { int: 0 }, { decimal: "0.0" }),
       ])
       .addSigner(senderPublicKey, (w: any) => [
-        w("coin.TRANSFER_XCHAIN", sender, receiver, { decimal: amount }, targetChain),
+        w("coin.TRANSFER_XCHAIN", sender, receiver, { decimal: formattedAmount }, targetChain),
       ])
       .setMeta({
         chainId: "0" as ChainId,
@@ -219,7 +229,7 @@ export function buildCTransferAcross(params: CTransferAcrossParams) {
       .execution(pactCode)
       .addData(keysetName, receiverGuard)
       .addSigner(senderPublicKey, (w: any) => [
-        w("coin.TRANSFER_XCHAIN", sender, receiver, { decimal: amount }, targetChain),
+        w("coin.TRANSFER_XCHAIN", sender, receiver, { decimal: formattedAmount }, targetChain),
       ])
       .setMeta({
         chainId: sourceChain as ChainId,

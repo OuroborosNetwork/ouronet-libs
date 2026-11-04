@@ -1,3 +1,41 @@
+## 2.12.1 — 2026-11-04
+
+**Snapshot refreshed against the post-V20 chain: surface `85ca12a96dfebd48` -> `f82f7b8e692c96ef`.**
+
+441 entrypoints and 453 previews, both unchanged — the surface did not move, the MODULE HASHES
+did. Round PureV20 redeployed twenty modules for `StoicSyntax-Prefixes.md` §7.22 (no full Ouronet
+account in a client-facing string) and §7.23 (a core `C_` does not compose the result string;
+Talos does), bumping `CodexV3`→`V4`, `PythiaV6`→`V7` and
+`AcquisitionFarmsVaultsTreasuriesV5`→`V6`.
+
+**No entrypoint changed shape, and that is the point of the refactor.** §7.23 moved the result
+sentence out of ten CORE `C_` functions and into their Talos wrappers; the wrappers' own
+signatures — which is all this registry indexes — are byte-identical. What moved is
+`provenance.moduleHash` on every entrypoint of a redeployed module, which is exactly what a
+consumer uses to tell a stale snapshot from a current one.
+
+
+**`formatDecimal`'s type signature is now `string | number`, not `unknown` — made explicit
+rather than inferred from runtime checks a caller had no way to see.**
+
+No behavioural change for a value that was already a valid input: a decimal `string` still
+renders verbatim (only a missing decimal point is added — Pact's lexer requires one, and
+trailing zeros are deliberately NOT trimmed, so a chain-sourced figure like
+`"16.800576521961000000000000"` still travels as the exact digits the chain sent); a `number`
+still goes through `toFixed(12)` with trailing-zero trimming, unchanged. The one call site
+inside this package that previously handed `formatDecimal` an `unknown` (`formatForType`'s
+`"decimal"` case) now casts explicitly — the cast is safe because `formatDecimal`'s own
+runtime check, not the TS type, is what actually refuses a bad value.
+
+**Why a patch and not a no-op:** this closes the far side of the Sublimate-overspend defect.
+The near side was `OuronetUI`'s `RegistryOpCFMModal.tsx`, which converted a MAX-filled,
+full-precision on-chain balance string into a JS `number` before ever reaching this package —
+at which point no formatter here could recover the lost digits. `formatDecimal`'s string
+branch already took the lossless path (since 2.11.0); this release makes that contract
+explicit at the type level and adds a regression test (`build.test.ts`) pinning
+`formatDecimal("9.849999999999977033567654")` byte-for-byte, so a future caller cannot
+reintroduce the `Number`/`toFixed` round trip without a test failing here too.
+
 ## 2.12.0 — 2026-10-31
 
 **The V18 surface, regenerated from the chain — and the first release in which 2.11.0's

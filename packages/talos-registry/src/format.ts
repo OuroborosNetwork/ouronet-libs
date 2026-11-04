@@ -15,8 +15,23 @@ export interface KeysetRef {
  * Pact's decimal lexer REJECTS a bare integer in a decimal slot: `5` is an integer literal and
  * will not coerce, so an amount of 5 must be emitted as `5.0`. Number.toString() gives "5".
  * This is the shipped defect the UI's builders call F-SEC-001.
+ *
+ * TWO INPUT SHAPES, AND ONLY ONE OF THEM MAY ROUND. A `string` is the LOSSLESS form -- it is
+ * what a caller has when an amount came from the chain or from a user/MAX-filled input, and
+ * Pact decimals carry up to 24 places where a JS `number` holds only ~15-17 significant digits.
+ * So a string is passed through VERBATIM (only a missing decimal point is added -- Pact's
+ * lexer requires one) and NEVER round-tripped through `Number`/`toFixed`, which is exactly the
+ * defect this closes (a full-precision balance string like "9.849999999999977033567654" coerced
+ * to a float and re-rounded by `toFixed(12)` becomes "9.850000000000", which is MORE than the
+ * true balance). Trailing zeros are deliberately NOT trimmed here, even though they carry no
+ * extra precision: a value read from the chain should travel as the exact digits the chain
+ * sent (see `pactDecimal`'s doc below and `object-field-types.test.ts`'s "passes a chain-shaped
+ * decimal string through verbatim"), and trimming would be one more transformation between the
+ * chain and the literal this function emits. A `number` is only the right shape for a
+ * genuinely computed value with no prior string form, and even then keeps the same formatting
+ * `toPactDecimal` in the UI's `pact-decimal.ts` uses, so the two surfaces agree.
  */
-export function formatDecimal(v: unknown): string {
+export function formatDecimal(v: string | number): string {
   if (typeof v === "string") {
     if (!/^-?\d+(\.\d+)?$/.test(v)) throw new RegistryError(`Not a decimal literal: "${v}"`);
     return v.includes(".") ? v : v + ".0";
@@ -25,6 +40,10 @@ export function formatDecimal(v: unknown): string {
     throw new RegistryError(`Expected a decimal, got ${JSON.stringify(v)}`);
   // toFixed(12) rather than toString(): 1e-7 stringifies to "1e-7", which Pact cannot read.
   // Trailing zeros are trimmed back, but at least one digit is always kept after the point.
+  // Reached only for a genuine JS `number` with no prior string form -- a value that started
+  // as a string (e.g. an on-chain balance) must be PASSED as a string to take the lossless
+  // branch above; by the time a float reaches here, any precision beyond float64's ~15-17
+  // significant digits is already gone, so this `toFixed(12)` is formatting, not the loss.
   const s = v.toFixed(12).replace(/0+$/, "");
   return s.endsWith(".") ? s + "0" : s;
 }
@@ -247,7 +266,12 @@ export function formatForType(value: unknown, type: string): string {
   }
   switch (t) {
     case "string":  return formatString(value);
-    case "decimal": return formatDecimal(value);
+    // `formatDecimal` is typed `string | number` so its OWN callers cannot pass a type that
+    // would silently coerce; `value` arrives here as `unknown` because this function renders
+    // whatever the registry's call-argument object carries. The cast is safe because
+    // `formatDecimal`'s runtime check (not the TS type) is what actually guards a bad value --
+    // anything else still throws `RegistryError` with the value named.
+    case "decimal": return formatDecimal(value as string | number);
     case "integer": return formatInteger(value);
     case "bool":    return formatBool(value);
     case "time":    return formatString(value);

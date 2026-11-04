@@ -61,6 +61,22 @@ describe("Pact literal rendering", () => {
     expect(formatDecimal(1e-7)).not.toMatch(/e/i);
     expect(formatDecimal(1e-7)).toBe("0.0000001");
   });
+  /**
+   * THE SUBLIMATE OVERSPEND, AT ITS SOURCE. A MAX-fill button in the UI seeds a decimal input
+   * with a full-precision on-chain balance string -- OURO declares 24 digits, so a real balance
+   * can read "9.849999999999977033567654". Coercing that through a JS `number` and back via
+   * `.toFixed(12)` ROUNDS it UP to "9.850000000000", which is MORE than the account holds; the
+   * chain then refuses (or, worse, the margin is thin enough that it does not). A string that is
+   * already a strict decimal literal must be passed straight through, never round-tripped.
+   */
+  it("never round-trips a decimal string through Number -- the balance stays exact", () => {
+    const balance = "9.849999999999977033567654";
+    expect(formatDecimal(balance)).toBe(balance);
+    expect(formatForType(balance, "decimal")).toBe(balance);
+    // Sanity check on the defect itself: the naive `Number(...).toFixed(12)` path this
+    // closes really does rewrite the balance upward, which is why the string path exists.
+    expect(Number(balance).toFixed(12)).toBe("9.850000000000");
+  });
   it("separates list elements with SPACES, not commas", () => {
     expect(formatForType([1, 2, 3], "[integer]")).toBe("[1 2 3]");
     expect(formatForType([1, 2], "[decimal]")).toBe("[1.0 2.0]");

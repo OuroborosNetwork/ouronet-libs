@@ -32,7 +32,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { setPactReader, type PactReader } from "@stoachain/stoa-core/reads";
-import { buildCrossChainTransfer } from "../src/interactions/crossChainFunctions";
+import { buildCrossChainTransfer, buildCTransferAcross } from "../src/interactions/crossChainFunctions";
 
 // Capture the original reader so we can restore it after each test.
 let originalReader: PactReader | undefined;
@@ -105,6 +105,64 @@ describe("buildCrossChainTransfer — v3.2.1 decimal validation", () => {
     const huge = "12312419843287492374257983275498759437593";
     const tx = buildCrossChainTransfer({ ...validParams, amount: huge });
     expect(tx.cmd).toContain(`${huge}.0`);
+  });
+});
+
+// ══ buildCTransferAcross — same F-BUG-003 defect, never closed here ═════════
+//
+// `buildCrossChainTransfer` above got the formatter in v3.2.1. Its sibling
+// `buildCTransferAcross` (step 0 of the C_TransferAcross cross-chain path) did
+// not -- it trusted a doc comment ("amount: string; // already formatted")
+// instead of calling the formatter itself, and BOTH UI call sites
+// (`CrossChainTransfer.tsx`, `MinerTransfer.tsx`) independently re-added the
+// exact lossy `parseFloat(...).toFixed(12)` pre-formatting that comment waved
+// away -- which is how a Sublimate-shaped overspend (a MAX-filled balance
+// string rounded UP by a `.toFixed(12)` round trip) reached this path too.
+describe("buildCTransferAcross — formats its own amount, trusts no caller contract", () => {
+  const validParams = {
+    sender: "k:abc",
+    receiver: "k:xyz",
+    receiverGuard: { keys: ["xyz"], pred: "keys-all" as const },
+    sourceChain: "1",
+    targetChain: "2",
+    senderPublicKey: "abc",
+  };
+
+  it("rejects malformed amount synchronously, exactly like buildCrossChainTransfer", () => {
+    expect(() =>
+      buildCTransferAcross({ ...validParams, amount: "garbage" }),
+    ).toThrow("Invalid decimal format");
+  });
+
+  it("preserves a full-precision balance string -- no Number round trip, no rounding", () => {
+    // The exact shape of the Sublimate overspend: an on-chain balance at OURO's declared
+    // 24-digit precision. `parseFloat(...).toFixed(12)` would round this UP to
+    // "9.850000000000", which is MORE than the account holds.
+    const balance = "9.849999999999977033567654";
+    const tx = buildCTransferAcross({ ...validParams, amount: balance });
+    expect(tx.cmd).toContain(balance);
+    expect(tx.cmd).not.toContain("9.850000000000");
+  });
+
+  it("formats the amount in BOTH the pact code and the TRANSFER_XCHAIN cap argument", () => {
+    const balance = "9.849999999999977033567654";
+    const tx = buildCTransferAcross({ ...validParams, amount: balance });
+    const cmd = JSON.parse(tx.cmd);
+    const capArgs = cmd.signers[0].clist.find((c: any) => c.name === "coin.TRANSFER_XCHAIN").args;
+    expect(capArgs[2]).toEqual({ decimal: balance });
+  });
+
+  it("adds the point an integral string needs, same as the sync builder above", () => {
+    const tx = buildCTransferAcross({ ...validParams, amount: "5" });
+    expect(tx.cmd).toContain("5.0");
+  });
+
+  it("still builds the chain-0 (DALOS.GAS_PAYER) branch with a formatted amount", () => {
+    const balance = "9.849999999999977033567654";
+    const tx = buildCTransferAcross({
+      ...validParams, sourceChain: "0", amount: balance, gasStationPublicKey: "gaspub",
+    });
+    expect(tx.cmd).toContain(balance);
   });
 });
 
