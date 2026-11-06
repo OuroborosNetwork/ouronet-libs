@@ -1,3 +1,33 @@
+## 2.12.2 — 2026-11-06
+
+**Snapshot refreshed against PureV21, and the generator stopped churning: surface
+`f82f7b8e692c96ef` -> `01e174e0c7a403e7`.**
+
+441 entrypoints and 453 previews, both unchanged. Two things moved, and only one of them is
+about the chain.
+
+**PureV21 redeployed ONE module.** `DALOS::UR_AccountCreationStoa` bound a whole-row read to
+`object{DALOS|GasManagementSchema}`, and the row it reads was written at genesis — before the
+field `account-creation-stoa` existed. Pact fails that BINDING before the body runs, so the
+`contains` guard added in October was never reached and the reader had been dead on mainnet
+since. One annotation removed. Verified live after the deploy: the reader answers `false` and
+`IGNIS::DALOS|URCi_DeployStandardAccount` answers `0`, where both were type-check failures.
+
+**The other change is this package's own artefact churning, and it is worth naming because it
+nearly produced a meaningless publish.** The Pact repo's `_registry.py` appended
+`ownership.requires` in the order its auth-surface scan yielded rows, and that order is not
+stable across runs. A regeneration moved **110 of those lists with ZERO content difference** —
+every one a pure reordering — which changed `surfaceHash` and therefore this file, and
+`executionSpecs.generated.ts` in every consumer.
+
+The order cannot be load-bearing: it already varied run to run, so anything depending on it was
+already broken. It is now sorted on canonical JSON text, verified by regenerating twice from the
+chain and diffing byte for byte. `unmapped`, one line below it in the generator, had been
+`sorted()` since it was written — same artefact, same requirement, that list was simply missed.
+
+**So: 0 deployed/repo divergences, and no entrypoint changed shape.** The figure that answers
+"did the callable surface change" is that one, not the hash.
+
 ## 2.12.1 — 2026-11-04
 
 **Snapshot refreshed against the post-V20 chain: surface `85ca12a96dfebd48` -> `f82f7b8e692c96ef`.**
