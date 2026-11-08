@@ -1,3 +1,57 @@
+## 2.13.0 — 2026-11-07
+
+**PureV23 + V24: the Equity company surface, COMPLETE. 441 -> 447 entrypoints and
+453 -> 460 previews, surface `01e174e0c7a403e7` -> `de3900b125e998b8`. Six entrypoints
+added, none removed, none reshaped -- and every one of the 447 carries a price.**
+
+**IT TOOK TWO ROUNDS, AND IT SHOULD HAVE TAKEN ONE.** PureV23 shipped the six entrypoints with no
+`INFO_` cost readers, which this package's own `every entrypoint has one` test caught while this
+release was being cut -- after the deploy rather than before. An entrypoint with no preview is an
+operation a wallet cannot quote: the user is asked to sign something whose price cannot be shown.
+PureV24 added the seven readers (the six below plus a shared `INFO_EQUITY|ShareMove`) and the
+release waited for it rather than shipping a surface that advertised six unpriceable operations.
+
+An `E|` collection is a tokenised company, and until this round its founder could not run it.
+The collection is issued with `owner-account` = the DPDC smart account -- deliberately, because
+that is what keeps its eight nonces sealed -- but DPDC management and the AQP pool governor both
+DERIVE from the owner, so they named a contract. Measured before the fix: 27 DPDC operations and
+12 AQP operations were reachable only by the project signature, and the pool could not even be
+made functional, because `C_AddScore` is owner-gated and `C_EnablePoolStake` requires a score.
+
+**The six new entrypoints are the company's own controls**, each gated on the CREATOR and each
+acting as `<dpdc>` underneath:
+
+| entrypoint | what it is |
+|---|---|
+| `TS02-C1.DPSF\|C_IssueShares` | create N million shares |
+| `TS02-C1.DPSF\|C_RetireShares` | retire N million -- a permissioned burn |
+| `TS02-C1.DPSF\|C_PauseCompany` | halt trading in the company's shares |
+| `TS02-C1.DPSF\|C_SetCompanyBranding` | the company's public identity |
+| `TS02-C1.DPSF\|C_UpgradeCompanyBranding` | extend the branding subscription |
+| `TS02-C1.DPSF\|C_RotateCompanyCreator` | hand the company over |
+
+**TWO OF THEM NEED MORE THAN A FORM.** `C_IssueShares` / `C_RetireShares` take `millions`, not a
+share count, and that is load-bearing rather than a convenience: `URC_SharesPerMillion` divides
+the share count by 1,000,000 with INTEGER division, so a supply that is not a whole number of
+millions truncates and every tier value collapses with it. A client offering a free-text share
+amount would be offering a way to break the collection.
+
+Retirement additionally requires the caller to HOLD its holder-side leg -- not the whole amount.
+Shares behind outstanding packages are escrowed in `<dpdc>`, so a retirement burns pro-rata from
+both pools: per million, K from the escrow and (1,000,000 - K) from the retirer, where K is the
+packaged percentage. A UI that checks the full amount against the user's balance will refuse
+operations the chain would accept.
+
+**`C_RotateCompanyCreator` NEEDS TWO SIGNATURES IN ONE TRANSACTION** -- the outgoing creator to
+authorise and the incoming one to accept, because `creator-account` is not consent-checked at
+issuance and an unchecked rotation would let anyone saddle any account with a company. No wallet
+here can collect two signatures yet. The entrypoint is in the surface because it exists on chain;
+it is not yet callable from a client.
+
+**Deployed and confirmed.** The governor change is visible on mainnet now: pool
+`DHCompany-mRAo7_KLqsJI` (asset `E|DH-SUVEHxb9UQ6_`) resolves to its creator rather than to the
+DPDC smart account, which is the account string this package's consumers must sign as.
+
 ## 2.12.2 — 2026-11-06
 
 **Snapshot refreshed against PureV21, and the generator stopped churning: surface
