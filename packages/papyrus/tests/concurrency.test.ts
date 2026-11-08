@@ -24,14 +24,21 @@ const withPartition = Object.entries(ENTRYPOINTS)
 
 describe("the registry's partitions, classified", () => {
   it("the population is what was measured — so a release that changes it is visible", () => {
-    // 2.12.0: 441 entrypoints, 34 carrying a partition. If these move, the mapping below has to
-    // be re-read against the new data rather than assumed to still hold -- and it did move, so
-    // it WAS re-read: measured 20 list/partition, 4 list/reduction, 8 architectural, 2 cursor.
+    // 2.13.0: 447 entrypoints, 34 carrying a partition. If these move, the mapping below has to
+    // be re-read against the new data rather than assumed to still hold.
     //
-    // WAS 442/36 AT 2.9.0, and the delta is three losses and one gain rather than drift. V18
+    // WAS 441/34 AT 2.12.0. THE POPULATION MOVED AND THE PARTITION COUNT DID NOT, which is the
+    // answer this test exists to force someone to check. PureV23 added the six Equity company
+    // entrypoints -- IssueShares, RetireShares, PauseCompany, SetCompanyBranding,
+    // UpgradeCompanyBranding, RotateCompanyCreator -- and every one is a PLAIN CLIENT: one
+    // transaction, no slicing, no cursor, so none carries a partition block. Verified by
+    // filtering `withPartition` for the six by name: none present. The classification below
+    // (20 list/partition, 4 list/reduction, 8 architectural, 2 cursor) is therefore untouched.
+    //
+    // WAS 442/36 AT 2.9.0, and that delta was three losses and one gain rather than drift. V18
     // moved `AQP-POOL|CCp_BatchDrain*` to the admin band, which the registry does not index,
     // and `AQP-EVCT|CCp_EvictMultiRewards` arrived with a partition block of its own.
-    expect(Object.keys(ENTRYPOINTS).length).toBe(441);
+    expect(Object.keys(ENTRYPOINTS).length).toBe(447);
     expect(withPartition.length).toBe(34);
   });
 
