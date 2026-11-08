@@ -1,3 +1,37 @@
+## 2.14.0 — 2026-11-08
+
+**PureV25: two entrypoints RENAMED. Surface `de3900b125e998b8` -> `03e3c45547972cf9`.
+447 entrypoints and 460 previews, unchanged in count -- `TS02-C1.DPSF|C_IssueShares` and
+`C_RetireShares` are now `DPSF|CC_IssueShares` and `DPSF|CC_RetireShares`.**
+
+**THIS IS THE RENAME CLASS THIS PACKAGE EXISTS FOR.** A missing module member is a RESOLUTION
+error: `try` cannot catch it and a consumer renders it as a default, so a client still calling
+`DPSF|C_IssueShares` does not report a broken call -- it reports nothing, which reads as "this
+company has no shares to issue". Raising the pin is not optional tidying; it is the difference
+between a loud failure and a silent one.
+
+**WHY THEY WERE RENAMED, which a consumer should know because it changes what the call costs.**
+Both doors now run `AQP-POOL::UEV_AQP|NoLiveStakeOfAsset`, which SCANS the DPSF tracker by asset
+to refuse a share-count change while any pool still holds a live stake of the collection. A scan
+in the execution tree is what the doubled `CC_` prefix means in this codebase, so the rename is
+the warning label rather than a cosmetic choice. Expect the call to cost more than its price
+sheet component suggests on a chain with many pools; the preview still quotes it.
+
+**WHAT THE GATE PREVENTS, measured.** A score's base is an accumulated signed delta, while the
+equity stake leg weighs a position at the LIVE share value and records nothing at stake time. So
+a stake that added W(m) is reversed by an unstake computing W(m'). On the DHCompany fixture:
+stake 5 tier-6 packages at m=1 (base 10,000), issue 1,000,000 shares, unstake in full -- the base
+landed on **-10,000**, and the score's global total with it.
+
+**THE CONSEQUENCE FOR A CLIENT IS A WORKFLOW, NOT A FIELD.** Changing a company's share count now
+REQUIRES that nothing of that collection is staked anywhere. The refusal names the blocking
+pools, so a UI can route the user: vacate or unstake those pools, then issue, then re-stake. An
+"Issue Shares" button that does not surface that ordering will produce a refusal the user cannot
+act on.
+
+`DPSF|C_PauseCompany`, `C_SetCompanyBranding`, `C_UpgradeCompanyBranding` and
+`C_RotateCompanyCreator` are untouched. No parameter list changed anywhere in this release.
+
 ## 2.13.0 — 2026-11-07
 
 **PureV23 + V24: the Equity company surface, COMPLETE. 441 -> 447 entrypoints and
