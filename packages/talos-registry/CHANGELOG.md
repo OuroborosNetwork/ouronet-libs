@@ -1,3 +1,49 @@
+## 2.15.0 — 2026-11-22
+
+**PureV31: UNITY reaches chain. Six new entrypoints, four new previews, surface
+`8f5097205d5383d8`. 447 -> 453 entrypoints, 460 -> 464 previews.**
+
+New entrypoints:
+
+- `TS01-C2.LQD|C_WrapUnity` — wrap native Unity into its Ouronet DPTF
+- `TS01-C2.LQD|C_UnwrapUnity` — redeem the wrapper for native Unity
+- `TS01-C2.VST|C_Bless`
+- `TS01-C2.VST|C_CreateBlessedLink`
+- `TS01-C2.VST|C_RepurposeBlessed`
+- `TS02-C3.AQP-SCR|C_SetSingleShareWeight`
+
+New previews: `INFO-ONE.INFO_VST|Bless`, `INFO_VST|CreateBlessedLink`,
+`INFO_VST|RepurposedBlessed`, `AQP-INFO.INFO_AQP-SCR|SetSingleShareWeight`.
+
+### READ THIS IF YOU CONSUME THE WRAP PAIR
+
+**`LQD|C_WrapUnity` and `LQD|C_UnwrapUnity` have NO cost preview.** They are the first
+entrypoints this registry has ever carried with none, and a consumer must handle that rather
+than assume every entrypoint pairs:
+
+```ts
+const ep = registry.entrypoints["TS01-C2.LQD|C_WrapUnity"];
+ep.preview            // null — there is no INFO_ reader to call
+```
+
+The other four members of the same family (`WrapStoa`, `UnwrapStoa`, `WrapUrStoa`,
+`UnwrapUrStoa`) all pair normally, so a consumer that infers "wrap ops have previews" from the
+Stoa pair will read `undefined` and render a confident zero. OuronetUI SKIPS both when
+generating execution specs for exactly this reason — they are callable, they simply cannot be
+quoted before signing.
+
+**It is a gap, not a decision.** An `INFO_` reader for a wrap is `OI|UDC_DynamicIgnisCost` over
+`LIQUID::URCi_<op>`, and `URCi_WrapUnity` / `URCi_UnwrapUnity` do not exist on chain yet. Adding
+them is `StoaLiquidStakingV4 -> V5` plus its seven consumers plus an INFO-ONE redeploy, so it is
+scheduled for the V32 round. When it lands, this package publishes again with both previews and
+the entrypoints pair like the rest.
+
+### Why the surface moved at all
+
+V31 put the `UNITY` module on ALL TEN StoaChain chains — native Unity is a coin, so balances,
+escrow and the volumetric fee exist everywhere, while its Vesta Vault is chain-0 only. The
+entrypoints above are the Ouronet-side surface of that: the DPTF wrapper and its peg.
+
 ## 2.14.0 — 2026-11-08
 
 **PureV25: two entrypoints RENAMED. Surface `de3900b125e998b8` -> `03e3c45547972cf9`.

@@ -17,7 +17,10 @@ buildCall("TS01-C1.DPTF|C_Transfer", {
 Note `1` became `1.0`. Pact's decimal lexer rejects a bare integer in a decimal slot, and that
 is the least interesting thing this package stops you getting wrong.
 
-**This build:** 447 entrypoints, 460 previews, surface `03e3c45547972cf9`, generated against mainnet.
+**This build:** 453 entrypoints, 464 previews, surface `8f5097205d5383d8`, generated against mainnet.
+**Two of the 453 carry no cost preview** — `LQD|C_WrapUnity` and `LQD|C_UnwrapUnity`, shipped by
+PureV31 ahead of their `INFO_` readers. Check `.preview` before calling it; see the 2.15.0
+CHANGELOG.
 Every figure in this file is asserted by `tests/readme.test.ts` against the bundled snapshot, so
 a stale number fails the suite rather than misleading a reader.
 
@@ -44,7 +47,7 @@ both classes are impossible.
 
 ## What an entry knows
 
-Nine things, for all 447 entrypoints:
+Nine things, for all 453 entrypoints:
 
 | | |
 |---|---|
@@ -62,7 +65,7 @@ Nine things, for all 447 entrypoints:
 
 | mode | n | meaning |
 |---|---|---|
-| `direct` | 417 | the inputs suffice |
+| `direct` | 423 | the inputs suffice |
 | `defpact` | 10 | multi-transaction by **continuation** |
 | `indirect-parallel` | 12 | a preflight cut into slices — order-independent, fire together |
 | `indirect-single` | 5 | one transaction, but a preflight supplies an argument |
@@ -178,9 +181,9 @@ Regenerate upstream with `python3 REPL/tools/_registry.py --probe`, then `npm ru
 ## Ghost values
 
 Every parameter has a worked example. They are keyed by **parameter name**, then by type, then
-derived from the contract's own `defschema` — 447 entrypoints share 2,290 slots but only 289
+derived from the contract's own `defschema` — 453 entrypoints share 2,313 slots but only 291
 distinct names, and four of those cover half of them. Authoring per entrypoint would mean
-writing the same account into 434 `patron` slots by hand.
+writing the same account into 440 `patron` slots by hand.
 
 Every id was read from **mainnet**, so the *shape* is real: you can see that a swpair is a
 four-segment pipe-joined string and an account is a glyph string, not a `k:` address.
@@ -228,7 +231,7 @@ usage is **restricted** carry a `use` block, keyed by parameter name:
 | `display` | render *this string* instead of the value |
 
 **Both flags default to `true`, and the block appears only when something is restricted** — 6 of
-447 entrypoints today, every one of them guard-taking. A `use` block on all 2,290 slots would be
+453 entrypoints today, every one of them guard-taking. A `use` block on all 2,313 slots would be
 noise consumers learn to skip, and the one entry that matters would be invisible inside it.
 
 The case that forced the split is `guard`. A guard **cannot be prefilled** — nobody may hand a

@@ -190,8 +190,22 @@ describe("previews", () => {
     const code = buildPreviewCall("TS01-C1.DPTF|C_ClearDispo", { patron: "p", account: "a" });
     expect(code).toBe(`(ouronet-ns.INFO-ONE.INFO_DPTF|ClearDispo "p" "a")`);
   });
-  it("every entrypoint has one", () => {
+  // THE LIST WAS EMPTY FOR THIS PACKAGE'S WHOLE HISTORY, and stopped being at 2.15.0. PureV31
+  // put the Unity wrap pair on chain ahead of their `INFO_` readers, so they are the first
+  // entrypoints the registry has ever carried with no preview.
+  //
+  // ASSERTED AS AN EXACT LIST, NOT RELAXED TO "SOME MAY LACK ONE". The point of the original
+  // assertion was that a consumer can call `preview` on anything; what replaces it has to keep
+  // saying which ones break that, or the next unpreviewable entrypoint arrives unannounced.
+  // When V32 ships `LIQUID::URCi_WrapUnity` / `URCi_UnwrapUnity` and the two `INFO_LIQUID|*`
+  // readers, this goes back to `[]` -- and the test fails until someone deletes the names,
+  // which is the direction that cannot rot.
+  const KNOWN_UNPREVIEWABLE = [
+    "TS01-C2.LQD|C_UnwrapUnity",
+    "TS01-C2.LQD|C_WrapUnity",
+  ];
+  it("every entrypoint has one, except the two V31 shipped ahead of their readers", () => {
     const without = entrypointKeys().filter(k => !getEntrypoint(k).preview);
-    expect(without).toEqual([]);
+    expect(without.sort()).toEqual(KNOWN_UNPREVIEWABLE);
   });
 });

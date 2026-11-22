@@ -55,8 +55,12 @@ teaches a call shape that will not work.
 
 ## Rule 2 — the arguments belong to the execution, the cost belongs to the preview
 
-**431 of the 447 entrypoints have a preview whose parameter list differs from their own.** Only 16
+**435 of the 451 entrypoints that HAVE a preview take a different parameter list from their own.** Only 16
 match. Different names, different order, different arity.
+
+Two of the registry's 453 entrypoints — `LQD|C_WrapUnity` and `LQD|C_UnwrapUnity` — have no
+preview at all, so they sit outside both counts. A consumer must not assume `preview` is
+present; see the 2.15.0 CHANGELOG.
 
 So the two cannot share one numbered list, and the preview's values cannot be labelled with the
 execution's names. That mislabelling was a real defect: it rendered `executor = <the pool id>`,

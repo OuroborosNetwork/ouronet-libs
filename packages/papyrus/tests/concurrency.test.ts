@@ -24,8 +24,20 @@ const withPartition = Object.entries(ENTRYPOINTS)
 
 describe("the registry's partitions, classified", () => {
   it("the population is what was measured — so a release that changes it is visible", () => {
-    // 2.13.0: 447 entrypoints, 34 carrying a partition. If these move, the mapping below has to
+    // 2.15.0: 453 entrypoints, 34 carrying a partition. If these move, the mapping below has to
     // be re-read against the new data rather than assumed to still hold.
+    //
+    // WAS 447/34 AT 2.13.0, and this delta is six gains with no reclassification. PureV31 put
+    // UNITY on chain and brought the Ouronet-side surface of it: `LQD|C_WrapUnity`,
+    // `LQD|C_UnwrapUnity`, `VST|C_Bless`, `VST|C_CreateBlessedLink`, `VST|C_RepurposeBlessed`
+    // and `AQP-SCR|C_SetSingleShareWeight`. Every one is a PLAIN CLIENT -- one transaction, no
+    // slicing, no cursor -- so none carries a partition block. Verified by filtering
+    // `withPartition` for the six by name: none present. The classification below
+    // (20 list/partition, 4 list/reduction, 8 architectural, 2 cursor) is therefore untouched.
+    //
+    // ONE OF THE SIX IS WORTH A CONSUMER'S ATTENTION ANYWAY, though not this test's: the two
+    // wrap entrypoints carry NO `preview`, the first in the registry's history to carry none.
+    // See @ouronet/talos-registry 2.15.0's CHANGELOG.
     //
     // WAS 441/34 AT 2.12.0. THE POPULATION MOVED AND THE PARTITION COUNT DID NOT, which is the
     // answer this test exists to force someone to check. PureV23 added the six Equity company
@@ -38,7 +50,7 @@ describe("the registry's partitions, classified", () => {
     // WAS 442/36 AT 2.9.0, and that delta was three losses and one gain rather than drift. V18
     // moved `AQP-POOL|CCp_BatchDrain*` to the admin band, which the registry does not index,
     // and `AQP-EVCT|CCp_EvictMultiRewards` arrived with a partition block of its own.
-    expect(Object.keys(ENTRYPOINTS).length).toBe(447);
+    expect(Object.keys(ENTRYPOINTS).length).toBe(453);
     expect(withPartition.length).toBe(34);
   });
 
