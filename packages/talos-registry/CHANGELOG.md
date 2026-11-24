@@ -1,3 +1,77 @@
+## 2.16.0 — 2026-11-24
+
+**PureV38: self-service delegation agencies. Three new entrypoints, and the two UNITY wraps
+finally pair. Surface `d428e5828e282bdc` -> `6700798391b730bf`. 453 -> 456 entrypoints,
+464 -> 466 previews, 451 -> 453 paired.**
+
+New entrypoints — an operator can now open an agency BY THEMSELVES:
+
+- `TS02-C3.AQP-DSA|CC_IssueAgency` — the whole open, in ONE transaction: the operator's own
+  acquisition pool, three score rungs from the vault's model, their employment, the admission
+  and the collateral stake. `(patron, executor, fvt-id, agency-name, fee-per-mille, stake-nonces)`
+- `TS02-C3.AQP-DSA|C_CloseAgency` — wind one down; the only thing that releases the operator's
+  collateral floor. `(patron, executor, fvt-id, score-entity-id)`
+- `TS02-C3.AQP-DSA|CC_ReopenAgency` — bring it back, REUSING the same pool and triplet so that
+  nothing is minted. `(patron, executor, fvt-id, score-entity-id, fee-per-mille, display-name,
+  stake-nonces)`
+
+Why this needed a chain round rather than a client change: `CC_OpenAgency` is step 4 of four, and
+steps 1 and 3 (`AQP-POOL|C_Issue`, `C_AddScore`) gate on CAP_AqpAssetOwner / CAP_PoolOwner, which
+resolve FROM THE ASSET. An operator is by definition someone who does not own it, so two of the
+four steps could only ever be run by the vault owner. PureV38 lets the operator pay with a
+permanent LOCK instead of with ownership.
+
+### THE IDS ARE DERIVED ON CHAIN, AND A CONSUMER MUST NOT TRY
+
+`CC_IssueAgency` takes a NAME and derives the pool id and the three rung ids from it with
+`UDC_Makeid`, which returns `<name>-<12 chars of prev-block-hash>`. An id computed by a client
+and sent in the next block DOES NOT MATCH the one the chain mints — so do not pre-compute them
+to show a user, and do not carry them between transactions. That is why this is one entrypoint
+and not a four-step wizard.
+
+### THE TWO UNITY WRAPS NOW PAIR — and read this if you worked around it
+
+2.15.0 said of `LQD|C_WrapUnity` / `LQD|C_UnwrapUnity`: *"When it lands, this package publishes
+again with both previews and the entrypoints pair like the rest."* V32 landed their `INFO_`
+readers and they still did not pair, for a reason that had nothing to do with the chain: the
+`LQD` -> `LIQUID` category rename needs a `PREVIEW_ALIAS` entry, the four Stoa wraps beside them
+have one, and these two never got theirs.
+
+```ts
+registry.entrypoints["TS01-C2.LQD|C_WrapUnity"].preview
+// 2.15.0: null
+// 2.16.0: "INFO-ONE.INFO_LIQUID|WrapUnity"
+```
+
+A consumer that special-cased the pair can drop the special case. One that SKIPPED them — which
+is what OuronetUI did when generating execution specs — now generates them like any other
+entrypoint, so both wraps gain a cost preview in the app.
+
+The failure is worth naming because it is the one an exemption table is most prone to: the waiver
+and the real gap covered for each other. The exemption said *"remove once V32 is SENT"*, so the
+pair was reported as unpreviewable FOR A STATED REASON and nobody re-checked after the round
+meant to end it; the staleness check could not fire either, because it asks whether an exempted
+entrypoint now pairs and these genuinely still did not.
+
+### THREE ENTRYPOINTS CARRY NO COST PREVIEW
+
+`CC_IssueAgency`, `C_CloseAgency` and `CC_ReopenAgency` have `preview: null`. They are BILLED
+normally — every fused leg collects IGNIS exactly as it did before they were fused — so the
+absence is of a PREVIEW, not of a price. What a consumer cannot do is show a figure before the
+user signs, and it must handle that rather than render a confident zero:
+
+```ts
+const ep = registry.entrypoints["TS02-C3.AQP-DSA|CC_IssueAgency"];
+ep.preview            // null — there is no INFO_ reader to call yet
+```
+
+It is a gap, not a decision. `CC_IssueAgency` fuses FIVE already-priced legs
+(`C_IssueScoreFromModel`, `C_AddScore` x3, `CC_OpenAgency` — step 1, the pool, is an `XE_` and
+collects no IGNIS, because the operator pays for the pool with the lock rather than with gas), so
+the figure is a SUM of five existing cumulators rather than new pricing. There is no
+cumulator-folding helper on the INFO path today, so `URCi_IssueAgency` has to be written in
+AQP-DSA — an interface bump and its cascade, i.e. its own round.
+
 ## 2.15.0 — 2026-11-22
 
 **PureV31: UNITY reaches chain. Six new entrypoints, four new previews, surface

@@ -50,7 +50,18 @@ describe("the registry's partitions, classified", () => {
     // WAS 442/36 AT 2.9.0, and that delta was three losses and one gain rather than drift. V18
     // moved `AQP-POOL|CCp_BatchDrain*` to the admin band, which the registry does not index,
     // and `AQP-EVCT|CCp_EvictMultiRewards` arrived with a partition block of its own.
-    expect(Object.keys(ENTRYPOINTS).length).toBe(453);
+    //
+    // WAS 453/34 AT 2.15.0. PureV38 added three — `AQP-DSA|CC_IssueAgency`, `C_CloseAgency` and
+    // `CC_ReopenAgency` — and none carries a partition, so the count below is untouched again.
+    // Checked rather than assumed, because two of the three are `CC_` (heavy): heaviness is
+    // about the gas a SINGLE transaction reaches, while a partition is about a call being CUT
+    // INTO several, and conflating the two is how a fused op would end up classified as a
+    // pager. `CC_IssueAgency` fuses five legs into ONE transaction; there is nothing to slice.
+    //
+    // THE THREE ALSO CARRY NO `preview`, which is this release's version of the note above
+    // about the wrap pair — and that pair now PAIRS, so they are no longer the exception.
+    // See @ouronet/talos-registry 2.16.0's CHANGELOG for both halves.
+    expect(Object.keys(ENTRYPOINTS).length).toBe(456);
     expect(withPartition.length).toBe(34);
   });
 

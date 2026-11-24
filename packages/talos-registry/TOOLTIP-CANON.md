@@ -55,7 +55,7 @@ teaches a call shape that will not work.
 
 ## Rule 2 — the arguments belong to the execution, the cost belongs to the preview
 
-**435 of the 451 entrypoints that HAVE a preview take a different parameter list from their own.** Only 16
+**437 of the 453 entrypoints that HAVE a preview take a different parameter list from their own.** Only 16
 match. Different names, different order, different arity.
 
 Two of the registry's 453 entrypoints — `LQD|C_WrapUnity` and `LQD|C_UnwrapUnity` — have no

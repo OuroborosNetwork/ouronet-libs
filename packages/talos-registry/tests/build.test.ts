@@ -197,14 +197,25 @@ describe("previews", () => {
   // ASSERTED AS AN EXACT LIST, NOT RELAXED TO "SOME MAY LACK ONE". The point of the original
   // assertion was that a consumer can call `preview` on anything; what replaces it has to keep
   // saying which ones break that, or the next unpreviewable entrypoint arrives unannounced.
-  // When V32 ships `LIQUID::URCi_WrapUnity` / `URCi_UnwrapUnity` and the two `INFO_LIQUID|*`
-  // readers, this goes back to `[]` -- and the test fails until someone deletes the names,
-  // which is the direction that cannot rot.
+  // THE UNITY PAIR LEFT THIS LIST IN 2.16.0, AND NOT THE WAY THIS COMMENT PREDICTED. It said the
+  // list goes back to `[]` when V32 ships the readers. V32 shipped them -- and the pair STILL did
+  // not pair, because the `LQD` -> `LIQUID` category rename needs a `PREVIEW_ALIAS` entry in
+  // `_registry.py` and theirs was never written, while the four Stoa wraps beside them had one.
+  //
+  // The lesson is about where the next failure of this shape will come from: this test watches
+  // the SYMPTOM (an entrypoint with no preview) and cannot distinguish "the chain has no reader"
+  // from "the generator cannot see the reader the chain has". For a whole round it reported the
+  // pair correctly and for the wrong reason, and the exemption that excused them said "remove
+  // once V32 is SENT" -- so the waiver and the real gap covered for each other.
+  //
+  // 2.16.0's three are PureV38's, and they are the first case: the readers do not exist yet.
+  // Each is registered in `PREVIEW_EXEMPT` with what it would take.
   const KNOWN_UNPREVIEWABLE = [
-    "TS01-C2.LQD|C_UnwrapUnity",
-    "TS01-C2.LQD|C_WrapUnity",
+    "TS02-C3.AQP-DSA|CC_IssueAgency",
+    "TS02-C3.AQP-DSA|CC_ReopenAgency",
+    "TS02-C3.AQP-DSA|C_CloseAgency",
   ];
-  it("every entrypoint has one, except the two V31 shipped ahead of their readers", () => {
+  it("every entrypoint has one, except the three PureV38 shipped ahead of their readers", () => {
     const without = entrypointKeys().filter(k => !getEntrypoint(k).preview);
     expect(without.sort()).toEqual(KNOWN_UNPREVIEWABLE);
   });
