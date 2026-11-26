@@ -61,7 +61,25 @@ describe("the registry's partitions, classified", () => {
     // THE THREE ALSO CARRY NO `preview`, which is this release's version of the note above
     // about the wrap pair — and that pair now PAIRS, so they are no longer the exception.
     // See @ouronet/talos-registry 2.16.0's CHANGELOG for both halves.
-    expect(Object.keys(ENTRYPOINTS).length).toBe(456);
+    //
+    // WAS 456/34 AT 2.16.0. PureV44 added FIVE — `AQP-FVT|CC_LatchFarmTemplate`,
+    // `C_ClearFarmTemplate`, `C_RegisterScoreEntity`, `C_AdmitScoreEntity` and
+    // `CC_RecomputeMemberCounts` — the farm-template surface. Measured, not assumed: all five
+    // report `execution.mode: "direct"` and none carries a partition block, so `withPartition`
+    // is untouched at 34 and the mapping below needs no new entry.
+    //
+    // TWO OF THE FIVE ARE `CC_` (heavy) AND STILL CARRY NO PARTITION, which is the same
+    // distinction the 2.15.0 note had to make: heaviness is about the gas ONE transaction
+    // reaches, a partition is about a call being CUT INTO several. `CC_LatchFarmTemplate`
+    // reads the farm's membership to derive its exemplar — heavy — but it is one write and
+    // there is nothing to slice. `CC_RecomputeMemberCounts` is the same shape.
+    //
+    // THIS ASSERTION IS WHY PAPYRUS SITS UPSTREAM OF NOTHING AND DOWNSTREAM OF THE REGISTRY.
+    // It reads the registry through a workspace SYMLINK, so the data moves the instant the
+    // package next door changes, with no install step in between — and the monorepo runs every
+    // workspace's tests before publishing any of them. A stale count here does not fail
+    // papyrus later, it BLOCKS talos-registry's own publish. It did exactly that on 2026-11-26.
+    expect(Object.keys(ENTRYPOINTS).length).toBe(461);
     expect(withPartition.length).toBe(34);
   });
 
