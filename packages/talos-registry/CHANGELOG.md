@@ -1,3 +1,57 @@
+## 2.19.0 — 2026-11-26
+
+**PureV45: the pending queue gets its two exits. Surface `7076b863137453cc` ->
+`4ca864cf01aa7805`. 461 -> 463 entrypoints, 471 -> 473 previews, 458 -> 460 paired.**
+
+| key | params | preview |
+|---|---|---|
+| `TS02-C3.AQP-FVT\|C_RejectScoreEntity` | `patron, executor, fvt-id, score-entity-id` | `INFO_AQP-FVT\|RejectScoreEntity` |
+| `TS02-C3.AQP-FVT\|C_WithdrawScoreEntity` | `patron, executor, fvt-id, score-entity-id` | `INFO_AQP-FVT\|WithdrawScoreEntity` |
+
+Identical parameter lists, and they are NOT interchangeable — see below.
+
+### What V44 shipped, and what it forgot
+
+2.18.0 brought the farm-template surface: a pool operator REGISTERS a score with somebody
+else's farm, and the farm owner ADMITS it. What it did not bring was any other way out.
+`XE_DropPending` had exactly one caller — inside admit — so a registration the owner did not
+want sat in `FVT|T|PendingMember` forever, and the registrant could not take it back either.
+Worse, they could not re-apply: `URC_FvtPendingExists` stays true and the register capability
+refuses a duplicate, so a mistaken application locked that score out of that farm permanently.
+
+### The two exits are gated on DIFFERENT accounts, so do not offer one for the other
+
+- **`C_RejectScoreEntity`** — only the FVT owner. A stranger who could reject would be able to
+  clear every competing application to a farm they do not own.
+- **`C_WithdrawScoreEntity`** — only the **stored registrant**, and that is not the same as the
+  score's current owner. A score can change hands between registering and withdrawing; the row
+  records who OFFERED it. Keying on present ownership would let a new owner cancel an offer
+  they never made, and would strand the row exactly when withdrawing matters most. **The farm
+  owner cannot withdraw** — they have reject, and their signature must not impersonate one.
+
+Neither re-runs the admission gates. Admit does, because it WRITES a member; these only clear a
+row that grants nothing. Re-running them would be worse than useless: a registration that has
+since stopped qualifying is the one an owner most wants cleared, and gating on it would strand
+the row forever.
+
+### A rejection is not a ban
+
+The row is dropped and the registrant may apply again. There is no deny-list, deliberately — one
+would need an unbounded table nobody can clear. What stops a resubmission loop is that each
+attempt costs the REGISTRANT the IGNIS.
+
+### The bug that made both exits traps until it was fixed
+
+`WI_PendingMember` used `insert`. Pact cannot delete a row, so the clear BLANKS to a sentinel and
+the key survives — meaning a score that had been rejected or withdrawn could **never be
+re-registered**, dying on *"Value already found while in Insert mode"*. Both exits would have
+been one-way doors of a different kind.
+
+It was unreachable in V44 and so invisible: the only drop was inside admit, and an admitted score
+can never be re-registered. The insert bug and the missing exit were one omission wearing two
+faces. Fixed to `write`; found by the first assertion that ever rejected a registration and then
+re-registered it.
+
 ## 2.18.0 — 2026-11-25
 
 **PureV44 is on chain: farm templates and foreign-score admission. FIVE new entrypoints, five

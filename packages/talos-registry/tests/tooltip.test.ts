@@ -207,7 +207,7 @@ describe("TOOLTIP-CANON.md quotes figures that are still true", () => {
   // figure in it is worse than one in a changelog, because it is quoted onward.
   const CANON = readFileSync(join(__dirname, "..", "TOOLTIP-CANON.md"), "utf8");
 
-  it("440 of 458 previews diverge, only 18 match", () => {
+  it("440 of 460 previews diverge, only 20 match", () => {
     let same = 0, diff = 0;
     for (const k of entrypointKeys()) {
       const ep = getEntrypoint(k);
@@ -218,9 +218,9 @@ describe("TOOLTIP-CANON.md quotes figures that are still true", () => {
       a === b ? same++ : diff++;
     }
     expect(diff).toBe(440);
-    expect(same).toBe(18);
-    expect(CANON).toContain("440 of the 458");
-    expect(CANON).toContain("Only 18");
+    expect(same).toBe(20);
+    expect(CANON).toContain("440 of the 460");
+    expect(CANON).toContain("Only 20");
   });
 
   it("225 placeholder slots across 147 entrypoints", () => {
