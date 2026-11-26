@@ -1,3 +1,125 @@
+## 2.18.0 — 2026-11-25
+
+**PureV44 is on chain: farm templates and foreign-score admission. FIVE new entrypoints, five
+new previews. Surface `51894e87795643f4` -> `7076b863137453cc`. 456 -> 461 entrypoints,
+466 -> 471 previews, 453 -> 458 paired.**
+
+> **2.17.0 was cut and never published.** It carried PureV43's five arity changes and was
+> superseded hours later by this round. Its entry is kept below because that surface transition
+> really happened on chain — a consumer upgrading from 2.16.0 gets both and should read both.
+> **The arity changes in 2.17.0 are the breaking part of this upgrade, not the entrypoints here.**
+
+### A farm can now be LATCHED to a score shape, and strangers can apply to join
+
+A class-0 **farm** admits other people's LP scores, so a stranger's score *definition* is
+adversarial input. Latching fixes the farm to the shape of its one enabled member; from then on
+it admits — and re-enables — only scores of that shape.
+
+| key | params | preview |
+|---|---|---|
+| `TS02-C3.AQP-FVT\|CC_LatchFarmTemplate` | `patron, executor, fvt-id` | `INFO_AQP-FVT\|LatchFarmTemplate` |
+| `TS02-C3.AQP-FVT\|C_ClearFarmTemplate` | `patron, executor, fvt-id` | `INFO_AQP-FVT\|ClearFarmTemplate` |
+| `TS02-C3.AQP-FVT\|C_RegisterScoreEntity` | `patron, executor, fvt-id, score-entity-type, score-entity-id` | `INFO_AQP-FVT\|RegisterScoreEntity` |
+| `TS02-C3.AQP-FVT\|C_AdmitScoreEntity` | `patron, executor, fvt-id, score-entity-id` | `INFO_AQP-FVT\|AdmitScoreEntity` |
+| `TS02-C3.AQP-FVT\|CC_RecomputeMemberCounts` | `patron, fvt-id` | `INFO_AQP-FVT\|RecomputeMemberCounts` |
+
+**`CC_LatchFarmTemplate` takes no score id.** It latches to the farm's one enabled member and
+derives the exemplar itself. There is nothing to pick, and a picker would imply a choice that
+does not exist.
+
+**`CC_RecomputeMemberCounts` takes no `executor`** — it is permissionless, and that is load
+bearing rather than lax. The counters gate admission and **fail closed**, so a farm whose
+counters drifted would otherwise be stuck until one specific account acted. It DERIVES both
+numbers from the membership, so the worst a stranger achieves by calling it is correctness.
+
+### Four states, and a client must be able to say which
+
+Read `RPS.URC_FvtMemberCountsCoherent`, `RPS.URC_FvtIzLatched` and
+`RPS.URC_FvtEnabledMemberCount`:
+
+| state | condition | what it means |
+|---|---|---|
+| `needs-backfill` | not coherent | counters disagree with `member-link-count`. Offer Recompute. **Not an error.** |
+| `open` | coherent, unlatched, 0 enabled | the next score admitted becomes the exemplar |
+| `must-latch` | coherent, unlatched, >=1 enabled | **latch before a second score can be admitted** |
+| `latched` | latched | template in force; Clear only while 0 are enabled |
+
+### Do not re-implement the admission rule
+
+The contract's gate is literally
+
+```
+(= (RPS.URC_FarmTemplateFields fvt-id)
+   (RPS.URC_ScoreEntityTemplateFields score-entity-type score-entity-id))
+```
+
+Both readers are public. **Diff those two objects** to tell a user which field disagrees.
+Deriving the comparison yourself from the template's individual fields is how a mirror drifts,
+and this system has three prior incidents on exactly that shape.
+
+### `fvt-class` alone does NOT tell you farm vs vault vs treasury
+
+Worth stating here because a consumer will get it wrong. `AQP-DSA` enforces
+*"DSA vault must be a class-0 FVT"*, so **every delegation vault reads as class 0** no matter
+what it stakes. The disambiguation the contract itself uses is the second field:
+
+```
+class 0 AND dsa-family-id == "|"   ->  a plain FARM        (the template gate applies)
+class 0 AND dsa-family-id != "|"   ->  a DELEGATION vault  (the template gate is skipped)
+class 1 / class 2                  ->  vault / treasury
+```
+
+`RPS.UR_FVT|DsaFamilyId` is the reader. Labelling on class alone files every delegation vault
+under "farm".
+
+## 2.17.0 — 2026-11-25
+
+**PureV43. Five parameter lists GREW, and no entrypoint was added or removed. Surface
+`6700798391b730bf` -> `51894e87795643f4`. 456 entrypoints, 466 previews, both unchanged.**
+
+A release with no new names is the one most likely to be skipped, so read the list. Every change
+here is an **arity change on an existing key** — the failure mode this package was written for,
+because Pact partially applies a short call and yields a closure rather than refusing it. A
+consumer on 2.16.0 that hand-writes any of these five calls gets *"Evaluation did not reduce to
+a value"*, not an error naming the missing argument.
+
+### Per-nonce amounts: semi-fungible stakes and collateral
+
+Four of the five add an `amounts` list beside an existing `nonces` list. A semi-fungible nonce
+holds a BALANCE, so a nonce id alone never said how much of it was being staked — the old shape
+could only mean "all of it".
+
+| key | added | position |
+|---|---|---|
+| `TS02-C3.AQP-POOL\|CC_StakeSemiFungibleCollectable` | `nonce-amounts:[integer]` | last (7th) |
+| `TS02-C3.AQP-DSA\|CC_IssueAgency` | `stake-amounts:[integer]` | last (7th) |
+| `TS02-C3.AQP-DSA\|CC_OpenAgency` | `stake-amounts:[integer]` | last (9th) |
+| `TS02-C3.AQP-DSA\|CC_ReopenAgency` | `stake-amounts:[integer]` | last (8th) |
+
+The two lists are **positionally paired** — `stake-amounts[i]` is the amount taken from
+`stake-nonces[i]` — so they must be the same length and the same order. For a non-fungible
+collateral nonce pass `1`.
+
+### `C_DefineDelegationVault` takes the multiplet family
+
+`TS02-C3.AQP-DSA|C_DefineDelegationVault` gains `multiplet-family-id:string` (last, 6th). A
+delegation vault's three score rungs are minted from a multiplet family, and the vault could not
+previously say which one.
+
+### Seven previews now name `AcquisitionSchemasV7`
+
+`INFO_AQP-POOL|FullVacate` and the six `BatchVacate*` / `BatchDrain*` readers declare their lane
+and leg object types one interface version later -- `AcquisitionSchemasV6.VCT|Vacate*` ->
+`...V7...`. The FIELDS are unchanged, so an object a consumer already builds still satisfies it;
+what changed is the type name the deployed `INFO_` declares. It matters only if you were matching
+on the declared type string.
+
+### Nothing to do if you use `buildCall`
+
+`buildCall` takes arguments **by name** and renders them in the contract's declared order, so a
+missing one is a named error at call time rather than a closure on chain. The upgrade is: install,
+then supply the new argument where the compiler or the thrown error tells you to.
+
 ## 2.16.0 — 2026-11-24
 
 **PureV38: self-service delegation agencies. Three new entrypoints, and the two UNITY wraps

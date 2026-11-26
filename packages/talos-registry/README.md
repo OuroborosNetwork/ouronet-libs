@@ -17,7 +17,7 @@ buildCall("TS01-C1.DPTF|C_Transfer", {
 Note `1` became `1.0`. Pact's decimal lexer rejects a bare integer in a decimal slot, and that
 is the least interesting thing this package stops you getting wrong.
 
-**This build:** 456 entrypoints, 466 previews, surface `6700798391b730bf`, generated against mainnet.
+**This build:** 461 entrypoints, 471 previews, surface `7076b863137453cc`, generated against mainnet.
 **Three of the 456 carry no cost preview** — `AQP-DSA|CC_IssueAgency`, `C_CloseAgency` and
 `CC_ReopenAgency`, shipped by PureV38 ahead of their `INFO_` readers. Check `.preview` before
 calling it; see the 2.16.0 CHANGELOG. (The two UNITY wraps were on this list until 2.16.0 and
@@ -48,7 +48,7 @@ both classes are impossible.
 
 ## What an entry knows
 
-Nine things, for all 456 entrypoints:
+Nine things, for all 461 entrypoints:
 
 | | |
 |---|---|
@@ -66,7 +66,7 @@ Nine things, for all 456 entrypoints:
 
 | mode | n | meaning |
 |---|---|---|
-| `direct` | 426 | the inputs suffice |
+| `direct` | 431 | the inputs suffice |
 | `defpact` | 10 | multi-transaction by **continuation** |
 | `indirect-parallel` | 12 | a preflight cut into slices — order-independent, fire together |
 | `indirect-single` | 5 | one transaction, but a preflight supplies an argument |
@@ -182,7 +182,7 @@ Regenerate upstream with `python3 REPL/tools/_registry.py --probe`, then `npm ru
 ## Ghost values
 
 Every parameter has a worked example. They are keyed by **parameter name**, then by type, then
-derived from the contract's own `defschema` — 456 entrypoints share 2,330 slots but only 292
+derived from the contract's own `defschema` — 461 entrypoints share 2,352 slots but only 293
 distinct names, and four of those cover half of them. Authoring per entrypoint would mean
 writing the same account into 440 `patron` slots by hand.
 
@@ -232,7 +232,7 @@ usage is **restricted** carry a `use` block, keyed by parameter name:
 | `display` | render *this string* instead of the value |
 
 **Both flags default to `true`, and the block appears only when something is restricted** — 6 of
-456 entrypoints today, every one of them guard-taking. A `use` block on all 2,330 slots would be
+461 entrypoints today, every one of them guard-taking. A `use` block on all 2,352 slots would be
 noise consumers learn to skip, and the one entry that matters would be invisible inside it.
 
 The case that forced the split is `guard`. A guard **cannot be prefilled** — nobody may hand a
