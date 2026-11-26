@@ -79,7 +79,24 @@ describe("the registry's partitions, classified", () => {
     // package next door changes, with no install step in between — and the monorepo runs every
     // workspace's tests before publishing any of them. A stale count here does not fail
     // papyrus later, it BLOCKS talos-registry's own publish. It did exactly that on 2026-11-26.
-    expect(Object.keys(ENTRYPOINTS).length).toBe(461);
+    // WAS 461/34 AT 2.18.0. PureV45 added TWO -- `AQP-FVT|C_RejectScoreEntity` and
+    // `C_WithdrawScoreEntity`, the pending queue's two exits. Measured: both report
+    // `execution.mode: "direct"` with no partition block, so `withPartition` is untouched at 34
+    // and the mapping below needs no new entry. A row DROP has nothing to slice.
+    //
+    // THIS ASSERTION HAS NOW BLOCKED TWO CONSECUTIVE PUBLISHES (2.18.0 and 2.19.0), and the
+    // cost is always paid by talos-registry rather than by papyrus. The monorepo runs every
+    // workspace's tests before publishing ANY of them, and papyrus reads the registry through a
+    // workspace SYMLINK -- so the moment the registry regenerates next door, this number is
+    // stale and the sibling's release dies on it. talos-registry's own tests were green both
+    // times.
+    //
+    // IF YOU ARE BUMPING talos-registry: update this line IN THE SAME COMMIT. Measure it, do
+    // not guess -- `node -e` over `../talos-registry/src/data/registry.json`, counting
+    // `Object.keys(entrypoints).length` and the entries with `execution.partition`. The second
+    // number moving is the interesting one; it means a new entrypoint is PARTITIONED and the
+    // concurrency mapping below needs a real decision, not a new total.
+    expect(Object.keys(ENTRYPOINTS).length).toBe(463);
     expect(withPartition.length).toBe(34);
   });
 
